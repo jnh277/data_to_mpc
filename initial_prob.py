@@ -24,8 +24,8 @@ def ssm(x, u, a=0.9, b=0.1):
 T = 150             # total simulation time
 T_init = 100         # initial number of time steps to record measurements for
 x0 = 3.0        # initial x
-r_true = 0.05         # measurement noise standard deviation
-q_true = 0.1         # process noise standard deviation
+r_true = 0.1         # measurement noise standard deviation
+q_true = 0.05         # process noise standard deviation
 
 
 # simulate the system
@@ -56,7 +56,7 @@ else:
     with open(path+model_name+'.pkl', 'wb') as file:
         pickle.dump(model, file)
 
-# model = pystan.StanModel(file='stan/LSSM_demo.stan')
+
 
 stan_data = {
     'N':T_init,
@@ -112,6 +112,9 @@ def expectation_cost(uc, ut, xt, x_star, a, b, w, qc, rc):
     V = np.sum((qc*(x - x_star)) ** 2) + np.sum((rc * uc)**2)
     return V
 
+# input bounds
+bnds = ((-3.0, 3.0),)*(N-1)
+
 uc = np.zeros(N-1)  # initialise uc
 
 for t in range(T_init-1,T-1):
@@ -148,7 +151,7 @@ for t in range(T_init-1,T-1):
     ut = u[t]
     cost = lambda uc: expectation_cost(uc, ut, xt, x_star, a, b, w, qc, rc)
     uc = np.hstack([uc[1:],0.0])
-    res = minimize(cost, uc)
+    res = minimize(cost, uc, bounds=bnds)
     uc = res.x
     u[t+1] = uc[0]
 
