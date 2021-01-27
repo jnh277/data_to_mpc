@@ -5,12 +5,7 @@ from helpers import plot_trace
 from pathlib import Path
 import pickle
 from scipy.optimize import minimize
-
-import jax.numpy as jnp
-from jax import grad, jit, device_put
-from jax.ops import index, index_add, index_update
-from jax.config import config
-config.update("jax_enable_x64", True)
+from scipy.optimize import NonlinearConstraint
 
 # aim of this script is to solve a single step of the MPC problem based on estimates from
 # 100 steps of measurements
@@ -98,37 +93,38 @@ plt.show()
 
 
 def col_vec(x):
-    return jnp.reshape(x, (-1,1))
+    return np.reshape(x, (-1,1))
 
 def row_vec(x):
-    return jnp.reshape(x, (1, -1))
+    return np.reshape(x, (1, -1))
 
 def simulate(xt, u, a, b, w):
     N = len(u)
     M = len(a)
-    x = jnp.zeros((M, N+1))
-    # x[:, 0] = xt
-    x = index_update(x, index[:,0], xt)
+    x = np.zeros((M, N+1))
+    x[:, 0] = xt
     for k in range(N):
-        # x[:, k+1] = a * x[:, k] + b * u[k] + w[:, k]
-        x = index_update(x, index[:, k+1], a * x[:, k] + b * u[k] + w[:, k])
+        x[:, k+1] = a * x[:, k] + b * u[k] + w[:, k]
     return x[:, 1:]
 
 def expectation_cost(uc, ut, xt, x_star, a, b, w, qc, rc):
-    u = jnp.hstack([ut, uc]) # u_t was already performed, so u is N-1
+    u = np.hstack([ut, uc]) # u_t was already performed, so u is N-1
     x = simulate(xt, u, a, b, w)
-    V = jnp.sum((qc*(x - x_star)) ** 2) + jnp.sum((rc * uc)**2)
+    V = np.sum((qc*(x - x_star)) ** 2) + np.sum((rc * uc)**2)
     return V
+
+def sigmoid(x):
+    return 1/(1+np.exp(-x))
+
+# def prob_constraint(uc, ut, xt, a, b, w):
+#     x = simulate(np.hstack(xt, [ut, uc[:1]]), a, b, w)
+#     return np.mean(np.sigmoid(x[:, 2]))      # apply constraint to x_{t+2}
 
 # input bounds
 bnds = ((-3.0, 3.0),)*(N-1)
 
-uc = jnp.zeros(N-1)  # initialise uc
-
-cost_jit = jit(expectation_cost)
-gradient = grad(cost_jit, argnums=0)
-def npgradient(x, *args): # need this wrapper for scipy.optimize.minimize
-    return 0+np.asarray(gradient(x, *args))  # adding 0 since 'L-BFGS-B' otherwise complains about contig. problems ...
+x_ub = 1.05
+uc = np.zeros(N-1)  # initialise uc
 
 z_store = np.zeros((M,T-T_init))
 for i, t in enumerate(range(T_init-1,T-1)):
@@ -150,7 +146,7 @@ for i, t in enumerate(range(T_init-1,T-1)):
 
     # state samples
     z = traces['z']
-    z_store[:, i] = z[:,-1]
+    z_store[:, i] = z[:, -1]
 
     # parameter samples
     a = traces['a']
@@ -161,16 +157,25 @@ for i, t in enumerate(range(T_init-1,T-1)):
     # we also need to sample noise
     w = np.reshape(q, (-1, 1)) * np.random.randn(M, N)  # uses the sampled stds
 
+
+
     # determine next control action u_{t+1}
     xt = z[:, t]
     ut = u[t]
-    # cost = lambda uc: expectation_cost(uc, ut, xt, x_star, a, b, w, qc, rc)
+    cost = lambda uc: expectation_cost(uc, ut, xt, x_star, a, b, w, qc, rc)
+
+    # add an output constraint to x_{t+2} (x_{t+1} is already decided)
+    con = lambda u: (simulate(xt,np.hstack([ut,u]),a, b, w)[:,1:]).flatten()
+    lb = -5 * np.ones((M*(N-1)))
+    ub = x_ub * np.ones((M*(N-1)))
+    nlc = NonlinearConstraint(con, lb, ub)
+
     uc = np.hstack([uc[1:],0.0])
-    args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
-            device_put(b), device_put(w), device_put(qc), device_put(rc))
-    res = minimize(cost_jit, uc, jac=npgradient, bounds=bnds, args=(ut,xt,x_star,a,b,w,qc,rc))
+    res = minimize(cost, uc, bounds=bnds, constraints=(nlc))
     uc = res.x
     u[t+1] = uc[0]
+
+x_mpc = simulate(xt, np.hstack([ut, uc]), a, b, w)
 
 plt.subplot(2,1,1)
 plt.plot(u)
@@ -183,9 +188,18 @@ plt.axvline(100, linestyle='--', color='k', linewidth=2)
 
 plt.show()
 
-plt.hist(z_store[:, 20])
-plt.axvline(x[20+T_init-1], linestyle='--', color='k', linewidth=2)
+
+for i in range(6):
+    plt.subplot(2,3,i+1)
+    plt.hist(x_mpc[:, i*3])
+    # plt.axvline(x[10+i*5+T_init-1], linestyle='--', color='k', linewidth=2)
+    plt.axvline(1.0, linestyle='--', color='g', linewidth=2)
+    plt.axvline(x_ub, linestyle='--', color='r', linewidth=2)
+    plt.xlabel('t+'+str(i*3+1))
+plt.tight_layout()
 plt.show()
+
+
 
 
 

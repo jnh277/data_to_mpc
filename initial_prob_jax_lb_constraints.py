@@ -131,6 +131,7 @@ def npgradient(x, *args): # need this wrapper for scipy.optimize.minimize
     return 0+np.asarray(gradient(x, *args))  # adding 0 since 'L-BFGS-B' otherwise complains about contig. problems ...
 
 z_store = np.zeros((M,T-T_init))
+count = 0
 for i, t in enumerate(range(T_init-1,T-1)):
     # simulate system
     # apply u_t
@@ -168,7 +169,8 @@ for i, t in enumerate(range(T_init-1,T-1)):
     uc = np.hstack([uc[1:],0.0])
     args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
             device_put(b), device_put(w), device_put(qc), device_put(rc))
-    res = minimize(cost_jit, uc, jac=npgradient, bounds=bnds, args=(ut,xt,x_star,a,b,w,qc,rc))
+    res = minimize(cost_jit, uc, jac=npgradient, bounds=bnds, args=(ut,xt,x_star,a,b,w,qc,rc),
+                   method='trust-constr')
     uc = res.x
     u[t+1] = uc[0]
 

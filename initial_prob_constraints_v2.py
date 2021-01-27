@@ -5,19 +5,14 @@ from helpers import plot_trace
 from pathlib import Path
 import pickle
 from scipy.optimize import minimize
-
-import jax.numpy as jnp
-from jax import grad, jit, device_put
-from jax.ops import index, index_add, index_update
-from jax.config import config
-config.update("jax_enable_x64", True)
+from scipy.optimize import NonlinearConstraint
 
 # aim of this script is to solve a single step of the MPC problem based on estimates from
 # 100 steps of measurements
 
 # how would we now choose to do control
 x_star = 1.0        # desired set point
-M = 200     # number of samples we will use for MC MPC
+M = 400     # number of samples we will use for MC MPC
 N = 20      # horizonline of MPC algorithm
 qc = 1.0    # cost on state error
 rc = 1.    # cost on control action
@@ -30,7 +25,7 @@ def ssm(x, u, a=0.9, b=0.1):
 T = 150             # total simulation time
 T_init = 100         # initial number of time steps to record measurements for
 x0 = 3.0        # initial x
-r_true = 0.1         # measurement noise standard deviation
+r_true = 0.05         # measurement noise standard deviation
 q_true = 0.05         # process noise standard deviation
 
 
@@ -98,37 +93,45 @@ plt.show()
 
 
 def col_vec(x):
-    return jnp.reshape(x, (-1,1))
+    return np.reshape(x, (-1,1))
 
 def row_vec(x):
-    return jnp.reshape(x, (1, -1))
+    return np.reshape(x, (1, -1))
 
 def simulate(xt, u, a, b, w):
     N = len(u)
     M = len(a)
-    x = jnp.zeros((M, N+1))
-    # x[:, 0] = xt
-    x = index_update(x, index[:,0], xt)
+    x = np.zeros((M, N+1))
+    x[:, 0] = xt
     for k in range(N):
-        # x[:, k+1] = a * x[:, k] + b * u[k] + w[:, k]
-        x = index_update(x, index[:, k+1], a * x[:, k] + b * u[k] + w[:, k])
+        x[:, k+1] = a * x[:, k] + b * u[k] + w[:, k]
     return x[:, 1:]
 
-def expectation_cost(uc, ut, xt, x_star, a, b, w, qc, rc):
-    u = jnp.hstack([ut, uc]) # u_t was already performed, so u is N-1
+def expectation_cost_aug(theta, ut, xt, x_star, a, b, w, qc, rc, N):
+    uc = theta[:N - 1]
+    s = theta[N-1]
+    u = np.hstack([ut, uc]) # u_t was already performed, so u is N-1
     x = simulate(xt, u, a, b, w)
-    V = jnp.sum((qc*(x - x_star)) ** 2) + jnp.sum((rc * uc)**2)
+    V = np.sum((qc*(x - x_star)) ** 2) + np.sum((rc * uc)**2) + 1*(s+1)**2
     return V
 
+def sigmoid(x, s):
+    return 1/(1+np.exp(-x/s))
+
+
+def prob_constraint(theta, ut, xt, a, b, w, N, x_ub):
+    uc = theta[:N-1]
+    s = theta[N-1]
+    x = simulate(xt, np.hstack([ut, uc]), a, b, w)
+    return np.mean(sigmoid(x_ub - x[:, 1:], s), axis=0)
+
 # input bounds
-bnds = ((-3.0, 3.0),)*(N-1)
+bnds = ((-3.0, 3.0),)*(N-1) + ((1e-5, None),)
 
-uc = jnp.zeros(N-1)  # initialise uc
+# output bounds
+x_ub = 1.05
 
-cost_jit = jit(expectation_cost)
-gradient = grad(cost_jit, argnums=0)
-def npgradient(x, *args): # need this wrapper for scipy.optimize.minimize
-    return 0+np.asarray(gradient(x, *args))  # adding 0 since 'L-BFGS-B' otherwise complains about contig. problems ...
+uc = np.zeros(N-1)  # initialise uc
 
 z_store = np.zeros((M,T-T_init))
 for i, t in enumerate(range(T_init-1,T-1)):
@@ -150,7 +153,8 @@ for i, t in enumerate(range(T_init-1,T-1)):
 
     # state samples
     z = traces['z']
-    z_store[:, i] = z[:,-1]
+    z_store[:, i] = z[:, -1]
+
 
     # parameter samples
     a = traces['a']
@@ -164,13 +168,26 @@ for i, t in enumerate(range(T_init-1,T-1)):
     # determine next control action u_{t+1}
     xt = z[:, t]
     ut = u[t]
-    # cost = lambda uc: expectation_cost(uc, ut, xt, x_star, a, b, w, qc, rc)
+
+    cost = lambda theta: expectation_cost_aug(theta, ut, xt, x_star, a, b, w, qc, rc, N)
+
+    # add an output constraint to x_{t+2} (x_{t+1} is already decided)
+    con = lambda theta: prob_constraint(theta,ut,xt,a,b,w,N,x_ub)
+    # lb = 0.95 * np.ones(((N-1)))
+    lb = 0.95
+    # ub = 1.0001 * np.ones(((N-1)))
+    ub = 1.001
+    nlc = NonlinearConstraint(con, lb, ub)
+
     uc = np.hstack([uc[1:],0.0])
-    args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
-            device_put(b), device_put(w), device_put(qc), device_put(rc))
-    res = minimize(cost_jit, uc, jac=npgradient, bounds=bnds, args=(ut,xt,x_star,a,b,w,qc,rc))
-    uc = res.x
+    theta = np.hstack([uc, 1.0])  # add the s variable init
+    res = minimize(cost, theta, bounds=bnds, constraints=(nlc))
+    uc = res.x[:-1]
     u[t+1] = uc[0]
+    # break
+
+# simulate what hte last control action was achieving
+x_mpc = simulate(xt, np.hstack([ut, uc]), a, b, w)
 
 plt.subplot(2,1,1)
 plt.plot(u)
@@ -183,9 +200,20 @@ plt.axvline(100, linestyle='--', color='k', linewidth=2)
 
 plt.show()
 
-plt.hist(z_store[:, 20])
-plt.axvline(x[20+T_init-1], linestyle='--', color='k', linewidth=2)
+
+
+
+for i in range(6):
+    plt.subplot(2,3,i+1)
+    plt.hist(x_mpc[:, i*3])
+    # plt.axvline(x[10+i*5+T_init-1], linestyle='--', color='k', linewidth=2)
+    plt.axvline(1.0, linestyle='--', color='g', linewidth=2)
+    plt.axvline(x_ub, linestyle='--', color='r', linewidth=2)
+    plt.xlabel('t+'+str(i*3+1))
+plt.tight_layout()
 plt.show()
+
+
 
 
 
