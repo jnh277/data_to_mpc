@@ -25,7 +25,7 @@ def ssm(x, u, a=0.9, b=0.1):
 T = 150             # total simulation time
 T_init = 100         # initial number of time steps to record measurements for
 x0 = 3.0        # initial x
-r_true = 0.1         # measurement noise standard deviation
+r_true = 0.05         # measurement noise standard deviation
 q_true = 0.05         # process noise standard deviation
 
 
@@ -174,6 +174,7 @@ for i, t in enumerate(range(T_init-1,T-1)):
     res = minimize(cost, uc, bounds=bnds, constraints=(nlc))
     uc = res.x
     u[t+1] = uc[0]
+    break
 
 x_mpc = simulate(xt, np.hstack([ut, uc]), a, b, w)
 

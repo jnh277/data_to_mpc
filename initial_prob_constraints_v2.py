@@ -6,6 +6,7 @@ from pathlib import Path
 import pickle
 from scipy.optimize import minimize
 from scipy.optimize import NonlinearConstraint
+from scipy.special import expit
 
 # aim of this script is to solve a single step of the MPC problem based on estimates from
 # 100 steps of measurements
@@ -109,24 +110,27 @@ def simulate(xt, u, a, b, w):
 
 def expectation_cost_aug(theta, ut, xt, x_star, a, b, w, qc, rc, N):
     uc = theta[:N - 1]
-    s = theta[N-1]
+    s = theta[N-1:]
     u = np.hstack([ut, uc]) # u_t was already performed, so u is N-1
     x = simulate(xt, u, a, b, w)
-    V = np.sum((qc*(x - x_star)) ** 2) + np.sum((rc * uc)**2) + 1*(s+1)**2
+    V = np.sum((qc*(x - x_star)) ** 2) + np.sum((rc * uc)**2) + 1 * (s+1)**2
     return V
 
 def sigmoid(x, s):
-    return 1/(1+np.exp(-x/s))
-
+    # return 1./(1.+np.exp(-x/s))
+    # return (np.tanh(x/s)+1.0)/2
+    return expit(x/s)
 
 def prob_constraint(theta, ut, xt, a, b, w, N, x_ub):
     uc = theta[:N-1]
-    s = theta[N-1]
+    s = theta[N-1:]
     x = simulate(xt, np.hstack([ut, uc]), a, b, w)
-    return np.mean(sigmoid(x_ub - x[:, 1:], s), axis=0)
+    return np.mean(sigmoid(x_ub - x[:, 1:], s[0]), axis=0)
 
 # input bounds
-bnds = ((-3.0, 3.0),)*(N-1) + ((1e-5, None),)
+# bnds = ((-3.0, 3.0),)*(N-1) + ((1e-6, None),)
+bnds = ((-100.0, 100.0),)*(N-1) + ((1e-6, None),)
+# bnds = ((None, None),)*(N-1) + ((1e-6, None))
 
 # output bounds
 x_ub = 1.05
@@ -174,17 +178,20 @@ for i, t in enumerate(range(T_init-1,T-1)):
     # add an output constraint to x_{t+2} (x_{t+1} is already decided)
     con = lambda theta: prob_constraint(theta,ut,xt,a,b,w,N,x_ub)
     # lb = 0.95 * np.ones(((N-1)))
-    lb = 0.95
+    lb = 0.99
     # ub = 1.0001 * np.ones(((N-1)))
     ub = 1.001
     nlc = NonlinearConstraint(con, lb, ub)
 
-    uc = np.hstack([uc[1:],0.0])
+    # uc = np.hstack([uc[1:],0.0])
+    uc = np.zeros(N - 1)  # initialise uc
     theta = np.hstack([uc, 1.0])  # add the s variable init
-    res = minimize(cost, theta, bounds=bnds, constraints=(nlc))
+    # , method='trust-constr',
+    res = minimize(cost, theta, bounds=bnds, constraints=(nlc), method='trust-constr',
+                   options={'disp': True, 'maxiter':1000, 'verbose':2})
     uc = res.x[:-1]
     u[t+1] = uc[0]
-    # break
+    break
 
 # simulate what hte last control action was achieving
 x_mpc = simulate(xt, np.hstack([ut, uc]), a, b, w)
