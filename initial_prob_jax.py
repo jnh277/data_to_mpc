@@ -175,7 +175,6 @@ xt = z[ind, -1]  # inferred state for current time step
 w = col_vec(q) * np.random.randn(M, N)  # uses the sampled stds
 
 ut = u[-1]      # control action that was just applied
-uc = np.hstack([uc[1:],0.0])
 res = minimize(cost_jit, uc, jac=npgradient, bounds=bnds, args=(ut,xt,x_star,a,b,w,qc,rc))
 # NOTE: the args command is the better way of dealing with extra inputs to cost and gradient functions
 print(res)
