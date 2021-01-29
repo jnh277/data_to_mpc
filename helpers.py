@@ -24,6 +24,12 @@ import seaborn as sns
 from scipy import signal
 from scipy.stats import gaussian_kde as kde
 
+def col_vec(x):
+    return np.reshape(x, (-1,1))
+
+def row_vec(x):
+    return np.reshape(x, (1, -1))
+
 def calculate_acf(x):
     lags = np.arange(0, 51, 1)
     acf = np.zeros(np.shape(lags))

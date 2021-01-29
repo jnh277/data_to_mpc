@@ -1,9 +1,11 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from pathlib import Path
-import pickle
-from scipy.optimize import minimize, least_squares
+"""
+Script for demonstrating and testing ways to use JAX to compute gradients, jacobians,
+and Hessians and use them within optimisation routines
 
+"""
+
+import numpy as np
+from scipy.optimize import minimize, least_squares
 import jax.numpy as jnp
 from jax import grad, jit, device_put, jacfwd, jacrev, jvp
 

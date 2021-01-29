@@ -1,0 +1,9 @@
+Cython==0.29.21
+jax==0.2.8
+jaxlib==0.1.59+cuda110
+matplotlib==3.3.3
+numpy==1.19.5
+pandas==1.2.1
+pystan==2.19.1.1
+scipy==1.6.0
+seaborn==0.11.1
