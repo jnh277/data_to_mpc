@@ -43,6 +43,7 @@ N = 20              # horizonline of MPC algorithm
 qc = 1.0            # cost on state error
 rc = 1.             # cost on control action
 x_ub = 1.05         # upper bound constraint on state
+u_ub = 3            # upper bound on input
 
 # simulation parameters
 T = 100             # number of time steps to simulate and record measurements for
@@ -145,24 +146,30 @@ def simulate(xt, u, a, b, w):
         x = index_update(x, index[:, k+1], a * x[:, k] + b * u[k] + w[:, k])
     return x[:, 1:]
 
+def logbarrier_upper(z, upper_bound, mu):
+    return jnp.sum(-mu * jnp.log(upper_bound - z))
+
+def logbarrier_lower(z, lower_bound, mu):
+    return jnp.sum(-mu * jnp.log(lower_bound - z))
+
 # jax compatible version of function to compute cost
-def expectation_cost(uc, ut, xt, x_star, a, b, w, qc, rc):
+def expectation_cost(uc, ut, xt, x_star, a, b, w, qc, rc, mu, u_ub):
     u = jnp.hstack([ut, uc]) # u_t was already performed, so uc is N-1
     x = simulate(xt, u, a, b, w)
-    V = jnp.sum((qc*(x - x_star)) ** 2) + jnp.sum((rc * uc)**2)
+    V = jnp.sum((qc*(x - x_star)) ** 2) + jnp.sum((rc * uc)**2) + logbarrier_upper(uc, u_ub, mu)
     return V
 
 # input bounds
 bnds = ((-3.0, 3.0),)*(N-1)
-uc = jnp.zeros(N-1)  # initialise uc
+
 
 # compile cost function
 cost_jit = jit(expectation_cost)
 gradient = grad(cost_jit, argnums=0)    # get function to return gradients with respect to uc
 hessian = jacfwd(jacrev(cost_jit, argnums=0))
 
-def npgradient(x, *args): # need this wrapper for scipy.optimize.minimize (or do we?)
-    return 0+np.asarray(gradient(x, *args))  # adding 0 since 'L-BFGS-B' otherwise complains about contig. problems ...
+# def npgradient(x, *args): # need this wrapper for scipy.optimize.minimize (or do we?)
+    # return 0+np.asarray(gradient(x, *args))  # adding 0 since 'L-BFGS-B' otherwise complains about contig. problems ...
 
 
 
@@ -179,8 +186,14 @@ xt = z[ind, -1]  # inferred state for current time step
 w = col_vec(q) * np.random.randn(M, N)  # uses the sampled stds
 
 ut = u[-1]      # control action that was just applied
-# res = minimize(cost_jit, uc, jac=npgradient, hess=hessian, method='Newton-CG', args=(ut,xt,x_star,a,b,w,qc,rc))
-res = minimize(cost_jit, uc, jac=gradient, hess=hessian, method='Newton-CG', args=(ut,xt,x_star,a,b,w,qc,rc))
+
+uc = jnp.zeros(N-1)  # initialise uc
+mu = 5e2            # initialise mu
+for i in range(20):
+    res = minimize(cost_jit, uc, jac=gradient, args=(ut,xt,x_star,a,b,w,qc,rc,mu,u_ub))
+    uc = res.x
+    mu = mu / 1.25
+# res = minimize(cost_jit, uc, jac=gradient, hess=hessian, method='Newton-CG', args=(ut,xt,x_star,a,b,w,qc,rc,mu,u_ub))
 
 # NOTE: the args command is the better way of dealing with extra inputs to cost and gradient functions
 print(res)
