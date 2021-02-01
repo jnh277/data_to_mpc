@@ -158,9 +158,7 @@ uc = jnp.zeros(N-1)  # initialise uc
 
 # compile cost function
 cost_jit = jit(expectation_cost)
-gradient = grad(cost_jit, argnums=0)    # get function to return gradients with respect to uc
-def npgradient(x, *args): # need this wrapper for scipy.optimize.minimize (or do we?)
-    return 0+np.asarray(gradient(x, *args))  # adding 0 since 'L-BFGS-B' otherwise complains about contig. problems ...
+gradient = jit(grad(cost_jit, argnums=0))    # get compiled function to return gradients with respect to uc
 
 # downsample the the HMC output since for illustration purposes we sampled > M
 ind = np.random.choice(len(a), M, replace=False)
@@ -175,7 +173,19 @@ xt = z[ind, -1]  # inferred state for current time step
 w = col_vec(q) * np.random.randn(M, N)  # uses the sampled stds
 
 ut = u[-1]      # control action that was just applied
-res = minimize(cost_jit, uc, jac=npgradient, bounds=bnds, args=(ut,xt,x_star,a,b,w,qc,rc))
+
+# put everything we want to call onto the gpu
+args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
+        device_put(b), device_put(w), device_put(qc), device_put(rc))
+
+# wrap up the jit functions
+def np_cost_jit(uc, *args):
+    return np.array(cost_jit(device_put(uc), *args))
+
+def np_gradient(uc, *args):  #
+    return np.array(gradient(device_put(uc), *args))
+
+res = minimize(np_cost_jit, uc, jac=np_gradient, bounds=bnds, args=(ut,xt,x_star,a,b,w,qc,rc))
 # NOTE: the args command is the better way of dealing with extra inputs to cost and gradient functions
 print(res)
 uc = res.x
