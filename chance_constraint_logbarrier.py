@@ -187,7 +187,8 @@ def cost(z, ut, xt, x_star, a, b, w, qc, rc, mu, gamma, x_ub, delta):
     # need a log barrier on each of the slack variables to ensure they are positve
     V2 = logbarrier(s, mu)
     # now the chance constraints
-    cx = chance_constraint(x, s, x_ub, gamma, delta)        # cx = c(u,s) - delta
+    cx = chance_constraint(x[:, 1:], s, x_ub, gamma, delta)        # cx = c(u,s) - delta
+    # the index from 1 onwards is to not place constraint on x_{t+1} since we cant chance u_t
     V3 = logbarrier(cx, mu)
     return V1 + V2 + V3
 
@@ -265,11 +266,11 @@ for i in range(max_iter):
         gamma = max(gamma / 1.25, 0.999e-3)
         # need to adjust the slack after changing gamma
         x_new = simulate(xt, np.hstack([ut, z[:N-1]]), a, b, w)
-        cx = chance_constraint(x_new, z[-1], x_ub, gamma, delta)
+        cx = chance_constraint(x_new[:,1:], z[-1], x_ub, gamma, delta)
         if cx.min() < 0:
             beta = 1e-10
             for j in range(52): # find the minimum change to the slack variable to make the problem feasible again
-                cx = chance_constraint(x_new, z[-1]+beta, x_ub, gamma, delta)
+                cx = chance_constraint(x_new[:, 1:], z[-1]+beta, x_ub, gamma, delta)
                 if cx.min() > 0+1e-5:
                     break
                 else:
