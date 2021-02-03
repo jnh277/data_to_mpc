@@ -35,12 +35,6 @@ The instructions beyond here are my installation process to put CUDA 11.1.0, cuD
 
 Following only these instructions will get you there but keep your phone handy to read this page.
 
-The steps to this are:
-* Install prequisites
-* Install CUDA toolkit via runfile
-* Install cuDNN library via .tar
-* Install Jax
-
 ## Install prerequisites 
 Remove the Nvidia proprietary driver iit is already installed. Install Python < 3.9.0 by any means. Check that `gcc` is installed with `gcc --version`. If not, probably just install all of `build-essentials` by way of `sudo apt-get install build-essentials`. Also, to make sure the kernel headers are there, there is no harm in running `sudo apt-get install linux-headers-$(uname -r)`. Done.
 
@@ -96,3 +90,19 @@ source ~/.bashrc
 `nvcc --version` should work! There is some additional verification to do [here](https://docs.nvidia.com/cuda/archive/11.1.0/cuda-installation-guide-linux/index.html#verify-installation).
 
 ## Install cuDNN library via .tar
+Go to the [download site](https://developer.nvidia.com/CUDnn), log in, and choose cuDNN v8.1 for 11.1 and click on cuDNN Library for Linux (x86_64) to get a tarball. After that is downloaded unpack it:
+```shell
+tar -xzvf cudnn-x.x-linux-x64-v8.x.x.x.tgz
+```
+Replaces the x's with the appropriate version numbers. In the unpacked directory, run: 
+```shell
+sudo cp cuda/include/cudnn*.h /usr/local/cuda/include 
+sudo cp -P cuda/lib64/libcudnn* /usr/local/cuda/lib64 
+sudo chmod a+r /usr/local/cuda/include/cudnn*.h /usr/local/cuda/lib64/libcudnn*
+```
+
+## Install Jax
+```shell
+pip install --upgrade pip
+pip install --upgrade jax jaxlib==0.1.59+cuda111 -f https://storage.googleapis.com/jax-releases/jax_releases.html
+```
