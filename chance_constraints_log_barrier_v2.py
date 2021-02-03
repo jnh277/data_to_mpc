@@ -176,7 +176,7 @@ def chance_constraint(x, s, x_ub, gamma, delta):    # upper bounded chance const
 
 # jax compatible version of function to compute cost
 def cost(z, ut, xt, x_star, a, b, w, qc, rc, mu, gamma, x_ub, delta):
-    # TODO: this should not be hard coded but having trouble with compilation right now when it is dynamic indexing
+    # TODO: this indexing should not be hard coded but having trouble with compilation right now when it is dynamic indexing
     uc = z[:19]              # control input variables  #
     s = z[19:]               # slack variables
 
@@ -242,7 +242,7 @@ for i in range(max_iter):
     # perform line search
     alpha = 1.0
     for k in range(52):
-        # need to use the wolfe conditions to ensure a bit of a better decrease
+        # todo: (lower priority) need to use the wolfe conditions to ensure a bit of a better decrease
         ztest = z + alpha * p
         ctest = np.array(cost_jit(device_put(ztest), *args))
         # if np.isnan(ctest) or np.isinf(ctest):
