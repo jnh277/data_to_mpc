@@ -201,12 +201,9 @@ hessian = jit(jacfwd(jacrev(cost, argnums=0)))
 mu = 1e4
 gamma = 1
 x_ub = 1
-delta = 0.05
+delta = 0.01
 
 # put everything we want to call onto the gpu
-# args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
-#         device_put(b), device_put(w), device_put(qc), device_put(rc),
-#         device_put(mu), device_put(gamma), device_put(x_ub), device_put(delta), device_put(N))
 args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
         device_put(b), device_put(w), device_put(qc), device_put(rc),
         device_put(mu), device_put(gamma), device_put(x_ub), device_put(delta))
@@ -235,6 +232,12 @@ for i in range(max_iter):
 
     # compute search direction
     p = - np.linalg.solve(h, g)
+    # check that we have a valid search direction and if not then fix
+    # TODO: make this less hacky (look at slides)
+    beta2 = 1e-8
+    while np.dot(p,g) > 0:
+        p = - np.linalg.solve((h + beta2 * np.eye(h.shape[0])),g)
+        beta2 = beta2 * 2
 
     # perform line search
     alpha = 1.0
@@ -266,7 +269,8 @@ for i in range(max_iter):
         # need to adjust the slack after changing gamma
         x_new = simulate(xt, np.hstack([ut, z[:N-1]]), a, b, w)
         cx = chance_constraint(x_new[:, 1:], z[N-1:], x_ub, gamma, delta)
-        z[N-1:] += -np.minimum(cx, 0)
+        tmp = -np.minimum(cx, 0)+1e-5
+        z[N-1:] += -np.minimum(cx, 0)+1e-6
         args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
                 device_put(b), device_put(w), device_put(qc), device_put(rc),
                 device_put(mu), device_put(gamma), device_put(x_ub), device_put(delta))
