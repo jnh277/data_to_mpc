@@ -183,7 +183,7 @@ def cost(z, ut, xt, x_star, a, b, w, qc, rc, mu, gamma, x_ub, delta):
     u = jnp.hstack([ut, uc]) # u_t was already performed, so uc is N-1
     x = simulate(xt, u, a, b, w)
     # state error and input penalty cost and cost that drives slack variables down
-    V1 = jnp.sum((qc*(x - x_star)) ** 2) + jnp.sum((rc * uc)**2) + jnp.sum(10 * (s + 100)**2)
+    V1 = jnp.sum((qc*(x - x_star)) ** 2) + jnp.sum((rc * uc)**2) + jnp.sum(10 * (s + 1e3)**2)
     # need a log barrier on each of the slack variables to ensure they are positve
     V2 = logbarrier(s, mu)
     # now the chance constraints
@@ -201,7 +201,7 @@ hessian = jit(jacfwd(jacrev(cost, argnums=0)))
 mu = 1e4
 gamma = 1
 x_ub = 1
-delta = 0.95
+delta = 0.98
 
 # put everything we want to call onto the gpu
 # args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
