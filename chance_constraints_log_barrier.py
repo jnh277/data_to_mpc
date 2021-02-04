@@ -12,12 +12,12 @@ Use a Monte Carlo style approach to perform MPC where the state constraints are 
 with a given probability.
 
 Current set up: Uses MC to give an expected cost and then satisfies,
-NO state constraints are implemented,
-input constraints are implemented
+Chance state constraints using a log barrier formulation
+No input constraints currently in place
 
 Implementation:
-This implementation uses scipy's optimisation routines
-Uses JAX to compile and run code on GPU/CPU and provide gradients for the optimisation routine
+Uses custom newton method to solve
+Uses JAX to compile and run code on GPU/CPU and provide gradients and hessians
 """
 
 # general imports
