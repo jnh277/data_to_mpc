@@ -66,15 +66,15 @@ sudo systemctl set-default multi-user.target
 ```
 If this worked, `systemctl get-default` should return `multi-user.target`. Reboot!
 
-After reboot, the GUI will not be loaded. Log in and navigate to the directory where the runfile was downloaded, then run the runfile:
+After reboot, the GUI will not be loaded. Log in and navigate to the directory where the runfile was downloaded, then run the runfile. For the 11.1.0 runfile:
 ```shell
 sudo sh cuda_11.1.0_455.23.05_linux.run
 ```
-It will appear to do nothing for a little bit, then an EULA will appear. It's probably poorly scaled, type `accept` and hit enter to dismiss. The next menu should be some installation settings, enter the Toolkit settings and exert your will if you want to stop it from making desktop shortcuts. Install everything as the samples are useful for validation. 
+It will appear to do nothing for a bit, then an EULA will appear. It's probably poorly scaled, type `accept` and hit enter to dismiss. The next menu should be some installation settings, enter the Toolkit settings and exert your will if you want to stop it from making desktop shortcuts. Install everything as the samples are useful for validation. 
 
 It will print nothing for a while again and should succeed. If it doesn't say on the last line that it has failed then it has succeeded. 
 
-After install lines need to be added to `~/.bashrc` or equivalent. The version number is in the path, so change it if installing a different version. Run:
+After install these lines need to be added to `~/.bashrc` or equivalent. The version number is in the path, so change it if installing a different version. Run:
 ```shell
 echo 'export PATH=/usr/local/cuda-11.1/bin${PATH:+:${PATH}}' >> ~/.bashrc
 echo 'export LD_LIBRARY_PATH=/usr/local/cuda-11.1/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' >> ~/.bashrc
@@ -87,8 +87,8 @@ And `sudo reboot` to return to the land of the sane.
 
 There is some additional verification to do [here](https://docs.nvidia.com/cuda/archive/11.1.0/cuda-installation-guide-linux/index.html#verify-installation).
 
-## Install cuDNN library via .tar
-Go to the [download site](https://developer.nvidia.com/CUDnn), log in, and choose cuDNN v8.1 for 11.2, 11.1 and 11.0 and click on "cuDNN Library for Linux (x86_64)" to get a tarball. After that is downloaded unpack it:
+## Install cuDNN library via .tgz
+Go to the [download site](https://developer.nvidia.com/CUDnn), log in, and choose cuDNN for 11.1, 11.1 and 11.2 and click on "cuDNN Library for Linux (x86_64)" to get a tarball. After that is downloaded unpack it:
 ```shell
 tar -xzvf cudnn-x.x-linux-x64-v8.x.x.x.tgz
 ```
@@ -104,4 +104,4 @@ sudo chmod a+r /usr/local/cuda/include/cudnn*.h /usr/local/cuda/lib64/libcudnn*
 pip install --upgrade pip
 pip install --upgrade jax jaxlib==0.1.59+cuda111 -f https://storage.googleapis.com/jax-releases/jax_releases.html
 ```
-Change `cuda111` to match the current CUDA version.
+Change `cuda111` to match the current CUDA version. If you visit the [URL in the command](https://storage.googleapis.com/jax-releases/jax_releases.html) there is a list of available versions.
