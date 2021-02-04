@@ -92,7 +92,7 @@ Go to the [download site](https://developer.nvidia.com/CUDnn), log in, and choos
 ```shell
 tar -xzvf cudnn-x.x-linux-x64-v8.x.x.x.tgz
 ```
-Replaces the x's with the appropriate version numbers. In the unpacked directory, run: 
+Replace the x's with the appropriate version numbers. In the unpacked directory, run: 
 ```shell
 sudo cp cuda/include/cudnn*.h /usr/local/cuda/include 
 sudo cp -P cuda/lib64/libcudnn* /usr/local/cuda/lib64 
