@@ -177,7 +177,6 @@ def chance_constraint(x, s, x_ub, gamma, delta):    # upper bounded chance const
 
 # jax compatible version of function to compute cost
 def cost(z, ut, xt, x_star, a, b, w, qc, rc, mu, gamma, x_ub, delta, N):
-    # TODO: this indexing should not be hard coded but having trouble with compilation right now when it is dynamic indexing
     # uc is given by z[:(N-1)]
     # epsilon is given by z[(N-1):2(N-1)]
     # other slack variables could go after this
@@ -190,7 +189,7 @@ def cost(z, ut, xt, x_star, a, b, w, qc, rc, mu, gamma, x_ub, delta, N):
     # state error and input penalty cost and cost that drives slack variables down
     V1 = jnp.sum((qc*(x - x_star)) ** 2) + jnp.sum((rc * uc)**2) + jnp.sum(10 * (epsilon + 1e3)**2)
     # need a log barrier on each of the slack variables to ensure they are positve
-    V2 = logbarrier(epsilon - delta, mu)       # aiming for 95% accuracy
+    V2 = logbarrier(epsilon - delta, mu)       # aiming for 1-delta% accuracy
     # now the chance constraints
     cx = chance_constraint(x[:,1:], epsilon, x_ub, gamma, delta)
     V3 = logbarrier(cx, mu)
@@ -267,7 +266,7 @@ for i in range(max_iter):
 
     if np.abs(np.dot(g,p)) < 1e-2: # if search direction was really small, then decrease mu and s for next iteration
         if mu < 1e-6 and gamma < 1e-3:
-            break
+            break   # termination criteria satisfied
 
         mu = max(mu / 2, 0.999e-6)
         gamma = max(gamma / 1.25, 0.999e-3)
