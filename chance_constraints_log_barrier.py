@@ -30,6 +30,7 @@ import pickle
 from scipy.optimize import minimize
 
 # jax related imports
+from jax.lax import dynamic_slice
 import jax.numpy as jnp
 from jax import grad, jit, device_put, jacfwd, jacrev
 from jax.ops import index, index_add, index_update
@@ -175,27 +176,31 @@ def chance_constraint(x, s, x_ub, gamma, delta):    # upper bounded chance const
     return jnp.mean(expit((x_ub - x) / gamma), axis=0) - (1 - s)     # take the sum over the samples (M)
 
 # jax compatible version of function to compute cost
-def cost(z, ut, xt, x_star, a, b, w, qc, rc, mu, gamma, x_ub, delta):
+def cost(z, ut, xt, x_star, a, b, w, qc, rc, mu, gamma, x_ub, delta, N):
     # TODO: this indexing should not be hard coded but having trouble with compilation right now when it is dynamic indexing
-    uc = z[:19]              # control input variables  #
-    s = z[19:]               # slack variables
+    # uc is given by z[:(N-1)]
+    # epsilon is given by z[(N-1):2(N-1)]
+    # other slack variables could go after this
+
+    uc = z[:(N-1)]              # control input variables  #
+    epsilon = z[19:]               # slack variables
 
     u = jnp.hstack([ut, uc]) # u_t was already performed, so uc is N-1
     x = simulate(xt, u, a, b, w)
     # state error and input penalty cost and cost that drives slack variables down
-    V1 = jnp.sum((qc*(x - x_star)) ** 2) + jnp.sum((rc * uc)**2) + jnp.sum(10 * (s + 1e3)**2)
+    V1 = jnp.sum((qc*(x - x_star)) ** 2) + jnp.sum((rc * uc)**2) + jnp.sum(10 * (epsilon + 1e3)**2)
     # need a log barrier on each of the slack variables to ensure they are positve
-    V2 = logbarrier(s - delta, mu)       # aiming for 95% accuracy
+    V2 = logbarrier(epsilon - delta, mu)       # aiming for 95% accuracy
     # now the chance constraints
-    cx = chance_constraint(x[:,1:], s, x_ub, gamma, delta)        # cx = c(u,s) - delta
+    cx = chance_constraint(x[:,1:], epsilon, x_ub, gamma, delta)
     V3 = logbarrier(cx, mu)
     return V1 + V2 + V3
 
 
 # compile cost and create gradient and hessian functions
-cost_jit = jit(cost)
-gradient = jit(grad(cost, argnums=0))    # get compiled function to return gradients with respect to z (uc, s)
-hessian = jit(jacfwd(jacrev(cost, argnums=0)))
+cost_jit = jit(cost, static_argnums=(13,))  # static argnums means it will recompile if N changes
+gradient = jit(grad(cost, argnums=0), static_argnums=(13,))    # get compiled function to return gradients with respect to z (uc, s)
+hessian = jit(jacfwd(jacrev(cost, argnums=0)), static_argnums=(13,))
 
 # define some optimisation settings
 mu = 1e4
@@ -210,13 +215,13 @@ args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
 
 # test
 z0 = jnp.hstack([jnp.zeros((N-1)), np.ones((N-1,))])
-test = cost_jit(z0, *args)
-testgrad = gradient(z0, *args)
-testhessian = hessian(z0, *args)
+test = cost_jit(z0, *args, N)
+testgrad = gradient(z0, *args, N)
+testhessian = hessian(z0, *args, N)
 
 max_iter = 1000
 
-z = np.hstack([np.zeros((N-1,)), np.ones((N-1,))]) # only using one slack variable for all constraints right now
+z = np.hstack([np.zeros((N-1,)), np.ones((N-1,))]) 
 mu = 1e4
 gamma = 1.0
 args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
@@ -226,9 +231,9 @@ args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
 for i in range(max_iter):
     # compute cost, gradient, and hessian
     jz = device_put(z)
-    c = np.array(cost_jit(jz, *args))
-    g = np.array(gradient(jz, *args))
-    h = np.array(hessian(jz, *args))
+    c = np.array(cost_jit(jz, *args, N))
+    g = np.array(gradient(jz, *args, N))
+    h = np.array(hessian(jz, *args, N))
 
     # compute search direction
     p = - np.linalg.solve(h, g)
@@ -244,7 +249,7 @@ for i in range(max_iter):
     for k in range(52):
         # todo: (lower priority) need to use the wolfe conditions to ensure a bit of a better decrease
         ztest = z + alpha * p
-        ctest = np.array(cost_jit(device_put(ztest), *args))
+        ctest = np.array(cost_jit(device_put(ztest), *args, N))
         # if np.isnan(ctest) or np.isinf(ctest):
         #     continue
         # nan and inf checks should be redundant

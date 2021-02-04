@@ -10,6 +10,18 @@ import jax.numpy as jnp
 from jax import grad, jit, device_put, jacfwd, jacrev, jvp
 
 
+def mysplit(x, b, N):
+    u = x[:N] +b
+    e = x[N:]
+    return u
+
+N = 10
+b = 1.0
+x = jnp.ones((2*N,))
+mysplit_jit = jit(mysplit, static_argnums=(2,))
+args = (b,N)
+test = mysplit_jit(x, *args)
+
 a = jnp.array([-2,1.5])
 c = 0.5
 def cost(x, a, c):
