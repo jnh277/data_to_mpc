@@ -15,7 +15,7 @@ pip install -r requirements.txt
 
 # Notes
 
-The jaxlib version in the current requirements.txt will be for cuda 11.0, if you are using a different version of cuda then you will need to install a different version of jaxlib, and installing jaxlib correctly also cannot be completed through pip.
+The jaxlib version in the current requirements.txt will be for cuda 11.0, if you are using a different version of cuda then you will need to install a different version of jaxlib, and installing jaxlib correctly also cannot be completed through `pip install -r requirements.txt`.
 
 CUDA 11.2 does not have a ready-made version of Jaxlib,
 
