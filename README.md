@@ -36,7 +36,7 @@ The instructions beyond here are my installation process to put CUDA 11.1.0, cuD
 Following only these instructions will get you there but keep your phone handy to read this page.
 
 ## Install prerequisites 
-Remove the Nvidia proprietary driver iit is already installed. Install Python < 3.9.0 by any means. Check that `gcc` is installed with `gcc --version`. If not, probably just install all of `build-essentials` by way of `sudo apt-get install build-essentials`. Also, to make sure the kernel headers are there, there is no harm in running `sudo apt-get install linux-headers-$(uname -r)`.
+Remove the Nvidia proprietary driver if it is already installed. Install Python < 3.9.0 by any means. Check that `gcc` is installed with `gcc --version`. If not, probably just install all of `build-essentials` by way of `sudo apt-get install build-essentials`. Also, to make sure the kernel headers are there, there is no harm in running `sudo apt-get install linux-headers-$(uname -r)`.
 
 ## Install CUDA toolkit via runfile
 To install CUDA using the runfile method first download the runfile after selecting a version from [this page](https://developer.nvidia.com/cuda-toolkit-archive) (the runfile is the same for all Linux distros). This command gets 11.1.0:
