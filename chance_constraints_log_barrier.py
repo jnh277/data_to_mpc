@@ -30,7 +30,6 @@ import pickle
 from scipy.optimize import minimize
 
 # jax related imports
-from jax.lax import dynamic_slice
 import jax.numpy as jnp
 from jax import grad, jit, device_put, jacfwd, jacrev
 from jax.ops import index, index_add, index_update
@@ -169,18 +168,17 @@ def simulate(xt, u, a, b, w):
     return x[:, 1:]
 
 #
-def logbarrier(z, mu):       # log barrier for the constraint z >= 0
-    return jnp.sum(-mu * jnp.log(z))
+def logbarrier(cu, mu):       # log barrier for the constraint c(u,s,epsilon) >= 0
+    return jnp.sum(-mu * jnp.log(cu))
 
-def chance_constraint(x, s, x_ub, gamma, delta):    # upper bounded chance constraint on the state
-    return jnp.mean(expit((x_ub - x) / gamma), axis=0) - (1 - s)     # take the sum over the samples (M)
+def chance_constraint(hu, epsilon, gamma):    # Pr(h(u) >= 0 ) >= (1-epsilon)
+    return jnp.mean(expit(hu / gamma), axis=0) - (1 - epsilon)     # take the sum over the samples (M)
 
 # jax compatible version of function to compute cost
-def cost(z, ut, xt, x_star, a, b, w, qc, rc, mu, gamma, x_ub, delta, N):
+def cost(z, ut, xt, x_star, a, b, w, qc, rc, Ax, bx, delta, mu, gamma, N):
+    # state constraints of the form Ax - bx >= 0
     # uc is given by z[:(N-1)]
     # epsilon is given by z[(N-1):2(N-1)]
-    # other slack variables could go after this
-
     uc = z[:(N-1)]              # control input variables  #
     epsilon = z[19:]               # slack variables
 
@@ -191,7 +189,7 @@ def cost(z, ut, xt, x_star, a, b, w, qc, rc, mu, gamma, x_ub, delta, N):
     # need a log barrier on each of the slack variables to ensure they are positve
     V2 = logbarrier(epsilon - delta, mu)       # aiming for 1-delta% accuracy
     # now the chance constraints
-    cx = chance_constraint(x[:,1:], epsilon, x_ub, gamma, delta)
+    cx = chance_constraint(np.matmul(Ax, x[:,1:]) - bx, epsilon, gamma)
     V3 = logbarrier(cx, mu)
     return V1 + V2 + V3
 
@@ -207,32 +205,25 @@ gamma = 1
 x_ub = 1
 delta = 0.01
 
-# put everything we want to call onto the gpu
-args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
-        device_put(b), device_put(w), device_put(qc), device_put(rc),
-        device_put(mu), device_put(gamma), device_put(x_ub), device_put(delta))
-
-# test
-z0 = jnp.hstack([jnp.zeros((N-1)), np.ones((N-1,))])
-test = cost_jit(z0, *args, N)
-testgrad = gradient(z0, *args, N)
-testhessian = hessian(z0, *args, N)
-
 max_iter = 1000
 
 z = np.hstack([np.zeros((N-1,)), np.ones((N-1,))]) 
 mu = 1e4
 gamma = 1.0
+Ax =
+
 args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
         device_put(b), device_put(w), device_put(qc), device_put(rc),
-        device_put(mu), device_put(gamma), device_put(x_ub), device_put(delta))
+        device_put(x_ub), device_put(delta))
 
+jmu = device_put(mu)
+jgamma = device_put(gamma)
 for i in range(max_iter):
     # compute cost, gradient, and hessian
     jz = device_put(z)
-    c = np.array(cost_jit(jz, *args, N))
-    g = np.array(gradient(jz, *args, N))
-    h = np.array(hessian(jz, *args, N))
+    c = np.array(cost_jit(jz, *args, jmu, jgamma, N))
+    g = np.array(gradient(jz, *args, jmu, jgamma, N))
+    h = np.array(hessian(jz, *args, jmu, jgamma, N))
 
     # compute search direction
     p = - np.linalg.solve(h, g)
@@ -248,7 +239,7 @@ for i in range(max_iter):
     for k in range(52):
         # todo: (lower priority) need to use the wolfe conditions to ensure a bit of a better decrease
         ztest = z + alpha * p
-        ctest = np.array(cost_jit(device_put(ztest), *args, N))
+        ctest = np.array(cost_jit(device_put(ztest), *args, jmu, jgamma, N))
         # if np.isnan(ctest) or np.isinf(ctest):
         #     continue
         # nan and inf checks should be redundant
@@ -272,16 +263,14 @@ for i in range(max_iter):
         gamma = max(gamma / 1.25, 0.999e-3)
         # need to adjust the slack after changing gamma
         x_new = simulate(xt, np.hstack([ut, z[:N-1]]), a, b, w)
-        cx = chance_constraint(x_new[:, 1:], z[N-1:], x_ub, gamma, delta)
-        tmp = -np.minimum(cx, 0)+1e-5
+        cx = chance_constraint(x_ub - x_new[:, 1:], z[N-1:], gamma)
         z[N-1:] += -np.minimum(cx, 0)+1e-6
-        args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
-                device_put(b), device_put(w), device_put(qc), device_put(rc),
-                device_put(mu), device_put(gamma), device_put(x_ub), device_put(delta))
+        jmu = device_put(mu)
+        jgamma = device_put(gamma)
 
 
 x_mpc = simulate(xt, np.hstack([ut, z[:N-1]]), a, b, w)
-cx = chance_constraint(x_mpc, 0.0, x_ub, gamma, delta)
+cx = chance_constraint(x_ub - x_mpc, 0.0, gamma)
 print('Constraint satisfaction')
 print(1 + cx)
 #
