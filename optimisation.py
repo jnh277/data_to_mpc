@@ -20,15 +20,15 @@ def log_barrier_cost(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, gamma, si
     ncx = len(state_constraints)    # number of state constraints
 
     o = w.shape[0]
-    uc = jnp.reshape(z[:(N-1)], (o, -1))              # control input variables  #,
-    epsilon = z[(N-1):(N-1)+ncx*(N-1)]               # slack variables on state constraints
-    s = z[(N-1)+ncx*(N-1):(N-1)+ncx*(N-1) + ncu * (N-1)]
+    uc = jnp.reshape(z[:N], (o, -1))                # control input variables  #,
+    epsilon = z[N:N+ncx*N]                          # slack variables on state constraint probabilities
+    s = z[N+ncx*N:N+ncx*N + ncu * N]                # slack variables on input constraints
 
-    u = jnp.hstack([ut, uc]) # u_t was already performed, so uc is N-1
+    u = jnp.hstack([ut, uc]) # u_t was already performed, so uc is the next N control actions
     x = simulate(xt, u, w, theta)
     # state error and input penalty cost and cost that drives slack variables down
     V1 = jnp.sum(jnp.matmul(sqc,jnp.reshape(x - x_star,(o,-1))) ** 2) + jnp.sum(jnp.matmul(src, uc)**2) + jnp.sum(100 * (epsilon + 1e3)**2) +\
-         jnp.sum(10 * (s + 1e3)**2)
+         jnp.sum(10.0 * (s + 1e3)**2)
     # need a log barrier on each of the slack variables to ensure they are positve
     V2 = logbarrier(epsilon - delta, mu) + logbarrier(s, mu)       # aiming for 1-delta% accuracy
     # now the chance constraints
@@ -38,18 +38,16 @@ def log_barrier_cost(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, gamma, si
     V3 = logbarrier(cx, mu) + logbarrier(cu + s, mu)
     return V1 + V2 + V3
 
-def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_star, sqc, src, delta, simulate, state_constraints, input_constraints, verbose=True):
-    mu = 1e4
-    gamma = 1.0
-    max_iter = 1000
+def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_star, sqc, src, delta, simulate,
+                            state_constraints, input_constraints, verbose=True, max_iter=1000, gamma=1.0, mu=1e4,
+                            epsilon0=1.0, s0=10.0):
 
-    [o,tmp] = uc0.shape
-    N = tmp+1
+    [o,N] = uc0.shape
 
     ncu = len(input_constraints)  # number of input constraints
     ncx = len(state_constraints)  # number of state constraints
 
-    z = np.hstack([uc0.flatten(), np.ones((ncx * (N - 1),)), 10 * np.ones((ncu * (N - 1),))])
+    z = np.hstack([uc0.flatten(), epsilon0*np.ones((ncx * N,)), s0 * np.ones((ncu * N,))])
 
     args = (device_put(ut), device_put(xt), device_put(x_star), device_put(theta),
             device_put(w), device_put(sqc), device_put(src), device_put(delta))
@@ -89,33 +87,58 @@ def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_st
             alpha = alpha / 2
 
         if k == 51 and np.abs(np.dot(g, p)) > 1e-2:
-            print('Failed line search')
+            status = 4
+            print('Unable to find an alpha that decreases cost')
             break
-        if verbose:
+        if verbose==2:
             print('Iter:', i + 1, 'Cost: ', c, 'nd:', np.dot(g, p), 'alpha: ', alpha, 'mu: ', mu, 'gamma: ', gamma)
 
         if np.abs(
                 np.dot(g, p)) < 1e-2:  # if search direction was really small, then decrease mu and s for next iteration
             if mu < 1e-6 and gamma < 1e-3:
+                status = 0
                 break  # termination criteria satisfied
 
             mu = max(mu / 2, 0.999e-6)
             gamma = max(gamma / 1.25, 0.999e-3)
             # need to adjust the slack after changing gamma
-            x_new = simulate(xt, np.hstack([ut, row_vec(z[:N - 1])]), w, theta)
+            # x_new = simulate(xt, np.hstack([ut, row_vec(z[:N - 1])]), w, theta)
+            x_new = simulate(xt, np.hstack([ut, row_vec(z[:N])]), w, theta)
             hx = jnp.concatenate([state_constraint(x_new[:, :, 1:]) for state_constraint in state_constraints], axis=2)
-            cx = chance_constraint(hx, z[N - 1:(N - 1) + ncx * (N - 1)], gamma)
-            z[N - 1:(N - 1) + ncx * (N - 1)] += -np.minimum(cx[0, :], 0) + 1e-6
+            # cx = chance_constraint(hx, z[N - 1:(N - 1) + ncx * (N - 1)], gamma)
+            cx = chance_constraint(hx, z[N:N + ncx * N], gamma)
+            z[N:N + ncx * N] += -np.minimum(cx[0, :], 0) + 1e-6
             jmu = device_put(mu)
             jgamma = device_put(gamma)
 
+    if status==0:
+        test1 = np.max(z[N:N + ncx * N] - delta) < 1e-6
+        test2 = np.max(z[N+ncx*N:N+ncx*N + ncu * N]) < 1e-6
 
-    uc = jnp.reshape(z[:(N-1)], (o, -1))              # control input variables  #,
-    epsilon = z[(N-1):(N-1)+ncx*(N-1)]               # slack variables on state constraints
-    s = z[(N-1)+ncx*(N-1):(N-1)+ncx*(N-1) + ncu * (N-1)]
+        if not test1 and not test2:
+            status = 3
+            if verbose:
+                print('Optimisation has converged but slack variables on state and input constraints not reduced to tolerance')
+        elif not test2:
+            status = 2
+            if verbose:
+                print('Optimisation has converged but slack variables on input constraints arent reduced to tolerance')
+        elif not test1:
+            status = 1
+            if verbose:
+                print('Optimisation has converged but slack variables on state constraints not reduced to tolerance \n'
+                  'hence desired probability of satisfying constraints may not be achieved.')
+        else:
+            if verbose:
+                print("Optimisation succesful")
+
+    uc = jnp.reshape(z[:N], (o, -1))              # control input variables  #,
+    epsilon = z[N:N+ncx*N]                        # slack variables on state constraints
+    s = z[N+ncx*N:N+ncx*N + ncu * N]
     result = {'uc':uc,
               'epsilon':epsilon,
               's':s,
+              'status':status,
               'gamma':gamma,
               'mu':mu,
               'gradient':g,
