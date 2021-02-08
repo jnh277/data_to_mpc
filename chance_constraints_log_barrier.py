@@ -13,7 +13,7 @@ with a given probability.
 
 Current set up: Uses MC to give an expected cost and then satisfies,
 Chance state constraints using a log barrier formulation
-No input constraints currently in place
+Input constraints using a log barrier formulation
 
 Implementation:
 Uses custom newton method to solve
@@ -27,7 +27,8 @@ import matplotlib.pyplot as plt
 from helpers import plot_trace, col_vec, row_vec
 from pathlib import Path
 import pickle
-from scipy.optimize import minimize
+
+
 
 # jax related imports
 import jax.numpy as jnp
@@ -35,15 +36,19 @@ from jax import grad, jit, device_put, jacfwd, jacrev
 from jax.ops import index, index_add, index_update
 from jax.config import config
 from jax.scipy.special import expit
+# optimisation module imports (needs to be done before the jax confix update)
+from optimisation import log_barrier_cost, solve_chance_logbarrier
+
 config.update("jax_enable_x64", True)           # run jax in 64 bit mode for accuracy
+
+
 
 # Control parameters
 x_star = 1.0        # desired set point
 M = 200             # number of samples we will use for MC MPC
 N = 20              # horizonline of MPC algorithm
-qc = 1.0            # cost on state error
-rc = 1.             # cost on control action
-x_ub = 1.05         # upper bound constraint on state
+sqc = np.array([[1.0]])            # square root cost on state error
+src = np.array([[1.0]])             # square root cost on control action
 
 # simulation parameters
 T = 100             # number of time steps to simulate and record measurements for
@@ -152,7 +157,9 @@ ut = np.expand_dims(np.array([u[-1]]), 0)      # control action that was just ap
 # ----- Solve the MC MPC control problem ------------------#
 
 # jax compatible version of function to simulate forward a sample / scenario
-def simulate(xt, u, a, b, w):
+def simulate(xt, u, w, theta):
+    a = theta['a']
+    b = theta['b']
     [o, M, N] = w.shape
     x = jnp.zeros((o, M, N+1))
     # x[:, 0] = xt
@@ -170,37 +177,42 @@ def chance_constraint(hu, epsilon, gamma):    # Pr(h(u) >= 0 ) >= (1-epsilon)
     return jnp.mean(expit(hu / gamma), axis=1) - (1 - epsilon)     # take the sum over the samples (M)
 
 # jax compatible version of function to compute cost
-def cost(z, ut, xt, x_star, a, b, w, qc, rc, delta, mu, gamma, state_constraints, input_constraints, N):
-    # uc is given by z[:(N-1)]
-    # epsilon is given by z[(N-1):2(N-1)]
-    # s is given by z[2(N-1):]
-    # TODO: make this adjustable to the size of u
-    uc = jnp.reshape(z[:(N-1)], (1, -1))              # control input variables  #,
-    # TODO: make the size of these adjustable to the number of constraints on x and u
-    epsilon = z[(N-1):2*(N-1)]               # slack variables on state constraints
-    s = z[2*(N-1):]
+# def cost(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, gamma, simulate, state_constraints, input_constraints, N):
+#     ncu = len(input_constraints)    # number of input constraints
+#     ncx = len(state_constraints)    # number of state constraints
+#
+#     o = w.shape[0]
+#     uc = jnp.reshape(z[:(N-1)], (o, -1))              # control input variables  #,
+#     epsilon = z[(N-1):(N-1)+ncx*(N-1)]               # slack variables on state constraints
+#     s = z[(N-1)+ncx*(N-1):(N-1)+ncx*(N-1) + ncu * (N-1)]
+#
+#     u = jnp.hstack([ut, uc]) # u_t was already performed, so uc is N-1
+#     x = simulate(xt, u, w, theta)
+#     # state error and input penalty cost and cost that drives slack variables down
+#     V1 = jnp.sum(jnp.matmul(sqc,jnp.reshape(x - x_star,(o,-1))) ** 2) + jnp.sum(jnp.matmul(src, uc)**2) + jnp.sum(100 * (epsilon + 1e3)**2) +\
+#          jnp.sum(10 * (s + 1e3)**2)
+#     # need a log barrier on each of the slack variables to ensure they are positve
+#     V2 = logbarrier(epsilon - delta, mu) + logbarrier(s, mu)       # aiming for 1-delta% accuracy
+#     # now the chance constraints
+#     hx = jnp.concatenate([state_constraint(x[:, :, 1:]) for state_constraint in state_constraints], axis=2)
+#     cx = chance_constraint(hx, epsilon, gamma)
+#     cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints],axis=1)
+#     V3 = logbarrier(cx, mu) + logbarrier(cu + s, mu)
+#     return V1 + V2 + V3
 
-    u = jnp.hstack([ut, uc]) # u_t was already performed, so uc is N-1
-    x = simulate(xt, u, a, b, w)
-    # state error and input penalty cost and cost that drives slack variables down
-    V1 = jnp.sum((qc*(x - x_star)) ** 2) + jnp.sum((rc * uc)**2) + jnp.sum(10 * (epsilon + 1e3)**2) +\
-         jnp.sum(10 * (s + 1e3)**2)
-    # need a log barrier on each of the slack variables to ensure they are positve
-    V2 = logbarrier(epsilon - delta, mu) + logbarrier(s, mu)       # aiming for 1-delta% accuracy
-    # now the chance constraints
-    hx = jnp.vstack([state_constraint(x[:, :, 1:]) for state_constraint in state_constraints])
-    cx = chance_constraint(hx, epsilon, gamma)
-    cu = jnp.vstack([input_constraint(uc) for input_constraint in input_constraints])
-    V3 = logbarrier(cx, mu) + logbarrier(cu + s, mu)
-    return V1 + V2 + V3
 
-
-# c = cost(z, *args, mu, gamma, state_constraints, input_constraints, N)
+# c = cost(z, *args, mu, gamma, simulate, state_constraints, input_constraints, N)
+# c = log_barrier_cost(z, *args, mu, gamma, simulate, state_constraints, input_constraints, N)
 
 # compile cost and create gradient and hessian functions
-cost_jit = jit(cost, static_argnums=(12,13,14))  # static argnums means it will recompile if N changes
-gradient = jit(grad(cost, argnums=0), static_argnums=(12, 13, 14))    # get compiled function to return gradients with respect to z (uc, s)
-hessian = jit(jacfwd(jacrev(cost, argnums=0)), static_argnums=(12, 13, 14))
+cost_jit = jit(log_barrier_cost, static_argnums=(11,12,13, 14))  # static argnums means it will recompile if N changes
+gradient = jit(grad(log_barrier_cost, argnums=0), static_argnums=(11, 12, 13, 14))    # get compiled function to return gradients with respect to z (uc, s)
+hessian = jit(jacfwd(jacrev(log_barrier_cost, argnums=0)), static_argnums=(11, 12, 13, 14))
+
+# cost_jit = jit(cost, static_argnums=(11,12,13, 14))  # static argnums means it will recompile if N changes
+# gradient = jit(grad(cost, argnums=0), static_argnums=(11, 12, 13, 14))    # get compiled function to return gradients with respect to z (uc, s)
+# hessian = jit(jacfwd(jacrev(cost, argnums=0)), static_argnums=(11, 12, 13, 14))
+
 
 # define some optimisation settings
 mu = 1e4
@@ -209,79 +221,29 @@ delta = 0.05
 
 max_iter = 1000
 
-z = np.hstack([np.zeros((N-1,)), np.ones((N-1,)), np.ones((N-1,))])
-mu = 1e4
-gamma = 1.0
+
 
 # define some state constraints, (these need to be tuples (so trailing comma))
-x_ub = 1.3
+x_ub = 1.25
 state_constraints = (lambda x: x_ub - x,)
-input_constraints = (lambda u: 5.0 - u, )
+input_constraints = (lambda u: 5.0 - u,)
 
-args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
-        device_put(b), device_put(w), device_put(qc), device_put(rc), device_put(delta))
-
-jmu = device_put(mu)
-jgamma = device_put(gamma)
-for i in range(max_iter):
-    # compute cost, gradient, and hessian
-    jz = device_put(z)
-    c = np.array(cost_jit(jz, *args, jmu, jgamma, state_constraints, input_constraints, N))
-    g = np.array(gradient(jz, *args, jmu, jgamma, state_constraints, input_constraints, N))
-    h = np.array(hessian(jz, *args, jmu, jgamma, state_constraints, input_constraints, N))
-
-    # compute search direction
-    p = - np.linalg.solve(h, g)
-    # check that we have a valid search direction and if not then fix
-    # TODO: make this less hacky (look at slides)
-    beta2 = 1e-8
-    while np.dot(p,g) > 0:
-        p = - np.linalg.solve((h + beta2 * np.eye(h.shape[0])),g)
-        beta2 = beta2 * 2
-
-    # perform line search
-    alpha = 1.0
-    for k in range(52):
-        # todo: (lower priority) need to use the wolfe conditions to ensure a bit of a better decrease
-        ztest = z + alpha * p
-        ctest = np.array(cost_jit(device_put(ztest), *args, jmu, jgamma, state_constraints, input_constraints, N))
-        # if np.isnan(ctest) or np.isinf(ctest):
-        #     continue
-        # nan and inf checks should be redundant
-        if ctest < c:
-            z = ztest
-            break
-
-        alpha = alpha / 2
-
-    if k == 51:
-        print('Failed line search')
-        break
-
-    print('Iter:', i+1, 'Cost: ', c, 'nd:',np.dot(g,p),'alpha: ', alpha, 'mu: ', mu, 'gamma: ', gamma)
-
-    if np.abs(np.dot(g,p)) < 1e-2: # if search direction was really small, then decrease mu and s for next iteration
-        if mu < 1e-6 and gamma < 1e-3:
-            break   # termination criteria satisfied
-
-        mu = max(mu / 2, 0.999e-6)
-        gamma = max(gamma / 1.25, 0.999e-3)
-        # need to adjust the slack after changing gamma
-        x_new = simulate(xt, np.hstack([ut, row_vec(z[:N-1])]), a, b, w)
-        hx = jnp.vstack([state_constraint(x_new[:, :, 1:]) for state_constraint in state_constraints])
-        cx = chance_constraint(hx, z[N-1:2*(N-1)], gamma)
-        # todo: this indexing should change depending on number of state constraints
-        z[N-1:2*(N-1)] += -np.minimum(cx[0,:], 0)+1e-6
-        jmu = device_put(mu)
-        jgamma = device_put(gamma)
+theta = {'a':a,
+         'b':b,}
 
 
-x_mpc = simulate(xt, np.hstack([ut, row_vec(z[:N-1])]), a, b, w)
-# x_mpc = simulate(xt, np.hstack([ut, 10.*np.ones((1,N-1))]), a, b, w)
-cx = chance_constraint(x_ub - x_mpc, 0.0, gamma)
-cu = [input_constraint(row_vec(z[:N-1])) for input_constraint in input_constraints]
-print('Constraint satisfaction')
-print(1 + cx)
+# solve mpc optimisation problem
+result = solve_chance_logbarrier(np.zeros((1,N-1)), cost_jit, gradient, hessian, ut, xt, theta, w, x_star, sqc, src,
+                            delta, simulate, state_constraints, input_constraints)
+
+uc = result['uc']
+
+x_mpc = simulate(xt, np.hstack([ut, uc]), w, theta)
+hx = jnp.concatenate([state_constraint(x_mpc[:, :, 1:]) for state_constraint in state_constraints], axis=2)
+cx = np.mean(hx > 0, axis=1)
+cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints],axis=1)
+print('State constraint satisfaction')
+print(cx)
 #
 for i in range(6):
     plt.subplot(2,3,i+1)
@@ -295,7 +257,7 @@ plt.tight_layout()
 plt.legend()
 plt.show()
 
-plt.plot(z[:N-1])
+plt.plot(uc[0,:])
 plt.title('MPC determined control action')
 plt.show()
 
