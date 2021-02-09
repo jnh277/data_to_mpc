@@ -45,8 +45,8 @@ second_order = True
 
 # Control parameters
 z1_star = 1.0        # desired set point in z1
-M = 200             # number of samples we will use for MC MPC
-N = 20              # horizonline of MPC algorithm
+Ns = 200             # number of samples we will use for MC MPC
+Nh = 20              # horizonline of MPC algorithm
 qc1 = 1.0            # cost on state error
 qc2 = 1.0
 rc1 = 1.0             # cost on control action
@@ -61,7 +61,7 @@ r2_true = 0.01
 q1_true = 0.05       # process noise standard deviation
 q2_true = 0.005       # process noise standard deviation
 m_true = 1;
-b_true = 0.07
+b_true = 0.7
 k_true = 0.25
 
 Nx = 2;
@@ -87,16 +87,16 @@ A[1,1] = -b_true/m_true
 B[1,0] = 1/m_true;
 
 
-z = np.zeros((Nx,T+1), dtype=float) # state history
+z_sim = np.zeros((Nx,T+1), dtype=float) # state history
 
 # initial state
-z[0,0] = z1_0 
-z[1,0] = z2_0 
+z_sim[0,0] = z1_0 
+z_sim[1,0] = z2_0 
 
 # noise predrawn and independant
-w = np.zeros((Nx,T),dtype=float)
-w[0,:] = np.random.normal(0.0, q1_true, T)
-w[1,:] = np.random.normal(0.0, q2_true, T)
+w_sim = np.zeros((Nx,T),dtype=float)
+w_sim[0,:] = np.random.normal(0.0, q1_true, T)
+w_sim[1,:] = np.random.normal(0.0, q2_true, T)
 
 # create some inputs that are random but held for 10 time steps
 u = np.random.uniform(-0.5,0.5, T*Nu)
@@ -106,15 +106,15 @@ u = np.reshape(u, (Nu,T))
 for k in range(T):
     # x1[k+1] = ssm1(x1[k],x2[k],u[k]) + w1[k]
     # x2[k+1] = ssm2(x1[k],x2[k],u[k]) + w2[k]
-    z[:,k+1] = ssm_euler(z[:,k],u[:,k],A,B,1.0) + w[:,k]
+    z_sim[:,k+1] = ssm_euler(z_sim[:,k],u[:,k],A,B,1.0) + w_sim[:,k]
 
 # simulate measurements
 v = np.zeros((Ny,T), dtype=float)
 v[0,:] = np.random.normal(0.0, r1_true, T)
 v[1,:] = np.random.normal(0.0, r2_true, T)
 y = np.zeros((Ny,T), dtype=float)
-y[0,:] = z[0,:-1]
-y[1,:] = (-k_true*z[0,:-1] -b_true*z[1,:-1] + u[0,:])/m_true
+y[0,:] = z_sim[0,:-1]
+y[1,:] = (-k_true*z_sim[0,:-1] -b_true*z_sim[1,:-1] + u[0,:])/m_true
 y = y + v; # add noise
 
 plt.subplot(2,1,1)
@@ -122,7 +122,7 @@ plt.plot(u[0,:])
 plt.plot(y[1,:],linestyle='None',color='r',marker='*')
 plt.title('Simulated inputs and measurement used for inference')
 plt.subplot(2, 1, 2)
-plt.plot(z[0,:])
+plt.plot(z_sim[0,:])
 plt.plot(y[0,:],linestyle='None',color='r',marker='*')
 plt.title('Simulated state 1 and measurements used for inferences')
 plt.tight_layout()
@@ -148,7 +148,7 @@ stan_data = {
     'T':1.0
 }
 
-fit = model.sampling(data=stan_data, warmup=1000, iter=1100)
+fit = model.sampling(data=stan_data, warmup=1000, iter=2000)
 traces = fit.extract()
 
 # state samples
@@ -156,18 +156,17 @@ z_samps = np.transpose(traces['z'],(1,0,2)) # Ns, Nx, T --> Nx, Ns, T
 
 
 # parameter samples
-m_samps = traces['m']
-k_samps = traces['k']
-b_samps = traces['b']
+m_samps = traces['m'].squeeze()
+k_samps = traces['k'].squeeze()
+b_samps = traces['b'].squeeze() # single valued parameters shall 1D numpy objects! The squeeze has been squoze
 q_samps = np.transpose(traces['q'],(1,0)) 
 r_samps = np.transpose(traces['r'],(1,0))
 
 # plot the initial parameter marginal estimates
-z1plt = z_samps[0,:].flatten()
-q1plt = q_samps[0,:].flatten()
-q2plt = q_samps[1,:].flatten()
-r1plt = r_samps[0,:].flatten()
-r2plt = r_samps[1,:].flatten()
+q1plt = q_samps[0,:].squeeze()
+q2plt = q_samps[1,:].squeeze()
+r1plt = r_samps[0,:].squeeze()
+r2plt = r_samps[1,:].squeeze()
 
 
 plot_trace(m_samps,2,4,1,'m')
@@ -185,8 +184,8 @@ for i in range(4):
     if i==1:
         plt.title('HMC inferred position')
     plt.subplot(2,2,i+1)
-    plt.hist(z[0, i*20+1],bins=30, label='p(x_'+str(i+1)+'|y_{1:T})', density=True)
-    plt.axvline(z[0,i*20+1], label='True', linestyle='--',color='k',linewidth=2)
+    plt.hist(z_samps[0,:,i*20+1],bins=30, label='p(x_'+str(i+1)+'|y_{1:T})', density=True)
+    plt.axvline(z_sim[0,i*20+1], label='True', linestyle='--',color='k',linewidth=2)
     plt.xlabel('x_'+str(i+1))
 plt.tight_layout()
 plt.legend()
@@ -194,18 +193,25 @@ plt.show()
 
 
 # downsample the the HMC output since for illustration purposes we sampled > M
-# ind = np.random.choice(len(a), M, replace=False)
-# a = a[ind]  # same indices for all to ensure they correpond to the same realisation from dist
-# b = b[ind]
-# q = q[ind]
-# r = r[ind]
+ind = np.random.choice(len(m_samps), Ns, replace=False)
+m_mpc = m_samps[ind]  # same indices for all to ensure they correpond to the same realisation from dist
+k_mpc = k_samps[ind]
+b_mpc = b_samps[ind]
+q_mpc = q_samps[:,ind]
+r_mpc = r_samps[:,ind]
+zt = z_samps[:,ind,-1]  # inferred state for current time step
 
-# xt = np.expand_dims(z[ind, -1],0)  # inferred state for current time step
+# predraw noise from sampled q! --> Ns number of Nh long scenarios assocation with a particular q
+w_mpc = np.zeros((Nx,Ns,Nh+1),dtype=float)
+w_mpc[0,:,:] = np.expand_dims(col_vec(q_mpc[0,:]) * np.random.randn(Ns, Nh+1), 0)  # uses the sampled stds, need to sample for x_t to x_{t+N+1}
+w_mpc[1,:,:] = np.expand_dims(col_vec(q_mpc[1,:]) * np.random.randn(Ns, Nh+1), 0)
+ut = np.expand_dims(u[:,-1], axis=1)      # control action that was just applied
 
-# # we also need to sample noise
-# w = np.expand_dims(col_vec(q) * np.random.randn(M, N+1), 0)  # uses the sampled stds, need to sample for x_t to x_{t+N+1}
-# ut = np.expand_dims(np.array([u[-1]]), 0)      # control action that was just applied
-
+# At this point I have:
+# zt which is the current inferred state, and is [Nx,Ns]: Ns samples of Nx column vector
+# ut which is the previously actioned control signal, and is [Nu,1]: 2D because of matmul
+# m,k,b *_mpc are [Ns] arrays of parameter value samples: 1D because simplicity
+# q,r *_mpc are [Nx/y,Ns]. Don't know why!
 
 # ----- Solve the MC MPC control problem ------------------#
 if second_order:
@@ -213,35 +219,35 @@ if second_order:
     print("2D MPC not done yet")
 else:
     # jax compatible version of function to simulate forward a sample / scenario
-    def simulate(xt, u, a, b, w):
+    def simulate(xt, u, a, b, w_sim):
         N = len(u)
         M = len(a)
         x = jnp.zeros((M, N+1))
         # x[:, 0] = xt
         x = index_update(x, index[:,0], xt)
         for k in range(N):
-            # x[:, k+1] = a * x[:, k] + b * u[k] + w[:, k]
-            x = index_update(x, index[:, k+1], a * x[:, k] + b * u[k] + w[:, k])
+            # x[:, k+1] = a * x[:, k] + b * u[k] + w_sim[:, k]
+            x = index_update(x, index[:, k+1], a * x[:, k] + b * u[k] + w_sim[:, k])
         return x[:, 1:]
 
     #
-    def logbarrier(z, mu):       # log barrier for the constraint z >= 0
-        return jnp.sum(-mu * jnp.log(z))
+    def logbarrier(z_sim, mu):       # log barrier for the constraint z_sim >= 0
+        return jnp.sum(-mu * jnp.log(z_sim))
 
     def chance_constraint(x, s, x_ub, gamma, delta):    # upper bounded chance constraint on the state
         return jnp.mean(expit((x_ub - x) / gamma), axis=0) - (1 - s)     # take the sum over the samples (M)
 
     # jax compatible version of function to compute cost
-    def cost(z, ut, xt, x_star, a, b, w, qc, rc, mu, gamma, x_ub, delta, N):
-        # uc is given by z[:(N-1)]
-        # epsilon is given by z[(N-1):2(N-1)]
+    def cost(z_sim, ut, xt, x_star, a, b, w_sim, qc, rc, mu, gamma, x_ub, delta, N):
+        # uc is given by z_sim[:(N-1)]
+        # epsilon is given by z_sim[(N-1):2(N-1)]
         # other slack variables could go after this
 
-        uc = z[:(N-1)]              # control input variables  #
-        epsilon = z[19:]               # slack variables
+        uc = z_sim[:(N-1)]              # control input variables  #
+        epsilon = z_sim[19:]               # slack variables
 
         u = jnp.hstack([ut, uc]) # u_t was already performed, so uc is N-1
-        x = simulate(xt, u, a, b, w)
+        x = simulate(xt, u, a, b, w_sim)
         # state error and input penalty cost and cost that drives slack variables down
         V1 = jnp.sum((qc*(x - x_star)) ** 2) + jnp.sum((rc * uc)**2) + jnp.sum(10 * (epsilon + 1e3)**2)
         # need a log barrier on each of the slack variables to ensure they are positve
@@ -253,7 +259,7 @@ else:
 
     # compile cost and create gradient and hessian functions
     cost_jit = jit(cost, static_argnums=(13,))  # static argnums means it will recompile if N changes
-    gradient = jit(grad(cost, argnums=0), static_argnums=(13,))    # get compiled function to return gradients with respect to z (uc, s)
+    gradient = jit(grad(cost, argnums=0), static_argnums=(13,))    # get compiled function to return gradients with respect to z_sim (uc, s)
     hessian = jit(jacfwd(jacrev(cost, argnums=0)), static_argnums=(13,))
 
     # define some optimisation settings
@@ -264,7 +270,7 @@ else:
 
     # put everything we want to call onto the gpu
     args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
-            device_put(b), device_put(w), device_put(qc), device_put(rc),
+            device_put(b), device_put(w_sim), device_put(qc), device_put(rc),
             device_put(mu), device_put(gamma), device_put(x_ub), device_put(delta))
 
     # test
@@ -275,16 +281,16 @@ else:
 
     max_iter = 100
 
-    z = np.hstack([np.zeros((N-1,)), np.ones((N-1,))]) 
+    z_sim = np.hstack([np.zeros((N-1,)), np.ones((N-1,))]) 
     mu = 1e4
     gamma = 1.0
     args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
-            device_put(b), device_put(w), device_put(qc), device_put(rc),
+            device_put(b), device_put(w_sim), device_put(qc), device_put(rc),
             device_put(mu), device_put(gamma), device_put(x_ub), device_put(delta))
 
     for i in range(max_iter):
         # compute cost, gradient, and hessian
-        jz = device_put(z)
+        jz = device_put(z_sim)
         c = np.array(cost_jit(jz, *args, N))
         g = np.array(gradient(jz, *args, N))
         h = np.array(hessian(jz, *args, N))
@@ -302,13 +308,13 @@ else:
         alpha = 1.0
         for k in range(52):
             # todo: (lower priority) need to use the wolfe conditions to ensure a bit of a better decrease
-            ztest = z + alpha * p
+            ztest = z_sim + alpha * p
             ctest = np.array(cost_jit(device_put(ztest), *args, N))
             # if np.isnan(ctest) or np.isinf(ctest):
             #     continue
             # nan and inf checks should be redundant
             if ctest < c:
-                z = ztest
+                z_sim = ztest
                 break
 
             alpha = alpha / 2
@@ -326,16 +332,16 @@ else:
             mu = max(mu / 2, 0.999e-6)
             gamma = max(gamma / 1.25, 0.999e-3)
             # need to adjust the slack after changing gamma
-            x_new = simulate(xt, np.hstack([ut, z[:N-1]]), a, b, w)
-            cx = chance_constraint(x_new[:, 1:], z[N-1:], x_ub, gamma, delta)
+            x_new = simulate(xt, np.hstack([ut, z_sim[:N-1]]), a, b, w_sim)
+            cx = chance_constraint(x_new[:, 1:], z_sim[N-1:], x_ub, gamma, delta)
             tmp = -np.minimum(cx, 0)+1e-5
-            z[N-1:] += -np.minimum(cx, 0)+1e-6
+            z_sim[N-1:] += -np.minimum(cx, 0)+1e-6
             args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
-                    device_put(b), device_put(w), device_put(qc), device_put(rc),
+                    device_put(b), device_put(w_sim), device_put(qc), device_put(rc),
                     device_put(mu), device_put(gamma), device_put(x_ub), device_put(delta))
 
 
-    x_mpc = simulate(xt, np.hstack([ut, z[:N-1]]), a, b, w)
+    x_mpc = simulate(xt, np.hstack([ut, z_sim[:N-1]]), a, b, w_sim)
     cx = chance_constraint(x_mpc, 0.0, x_ub, gamma, delta)
     print('Constraint satisfaction')
     print(1 + cx)
@@ -351,7 +357,7 @@ else:
     plt.legend()
     plt.show()
 
-    plt.plot(z[:N-1])
+    plt.plot(z_sim[:N-1])
     plt.title('MPC determined control action')
     plt.show()
 
