@@ -13,6 +13,7 @@ with a given probability.
 
 Current set up: Uses MC to give an expected cost and then satisfies,
 Chance state constraints using a log barrier formulation
+Chance state constraints using a log barrier formulation
 Input constraints using a log barrier formulation
 
 Implementation:
@@ -28,14 +29,12 @@ from helpers import plot_trace, col_vec, row_vec
 from pathlib import Path
 import pickle
 
-
-
 # jax related imports
 import jax.numpy as jnp
 from jax import grad, jit, device_put, jacfwd, jacrev
 from jax.ops import index, index_add, index_update
 from jax.config import config
-from jax.scipy.special import expit
+
 # optimisation module imports (needs to be done before the jax confix update)
 from optimisation import log_barrier_cost, solve_chance_logbarrier
 
@@ -44,7 +43,7 @@ config.update("jax_enable_x64", True)           # run jax in 64 bit mode for acc
 
 
 # Control parameters
-x_star = 1.0        # desired set point
+x_star = np.array([[1.0]])        # desired set point
 M = 200             # number of samples we will use for MC MPC
 N = 20              # horizonline of MPC algorithm
 sqc = np.array([[1.0]])            # square root cost on state error

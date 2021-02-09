@@ -14,13 +14,65 @@ def chance_constraint(hu, epsilon, gamma):    # Pr(h(u) >= 0 ) >= (1-epsilon)
     return jnp.mean(expit(hu / gamma), axis=1) - (1 - epsilon)     # take the sum over the samples (M)
 
 def log_barrier_cost(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, gamma, simulate, state_constraints, input_constraints, N):
+    """
+    log barrier cost function for solving the MPC optimisation problem with state chance constraints
+    and input constraints.
+
+    Definitions:
+        o: number of states
+        N: horizon we wish to optimise the control inputs over
+        M: number of samples in the Monte Carlo approximation
+        ncx: number of state constraints (each state constraint is applied over the entire horizon)
+        ncu: number of input constraints (each input constraint is applied over the entire horizon)
+
+    Inputs
+        z: array of parameters to be optimised, contains the control inputs (uc), and the chance constraint
+            slack variables (epsilon). uc is size [1,N], and epsilon is size [ncx*N,]. These are flattened
+            and stacked.
+        ut: control action applied at current time t, that takes current state x_t to next state x_t
+            has size [1,1] or [1,]
+        xt: current state
+        x_star: desired state - array of size [o,] or [o,1]
+        theta: dictionary of model parameters, should be M samples of each parameter
+                (stacked in array or some such)
+        w: process noise - array of size [o,M,N+1]
+        sqc: square root of the state error weighting matrix - size [o,o]
+        src: square root of the input weighting matrix - size [1,1]
+        delta: target maximum probability of state constraint violation - scalar
+        mu: log barrier parameter - scalar
+        gamma: sigmoid indicator function approximation parameter - scalar
+        simulate: function to simulate the evolution of the systems states
+            matching template
+            def simulate(xt, u, w, theta)
+                return array of size [o,M,N] containing x_{t+1},...,x_{t+1+N}
+            where u = [ut,uc]
+            Must contain only jax compatible functions.
+        state_constraints: tuple or list of state constraint functions h_i(x), which
+            the optimisation will satisfy h_i(x) > 0 with probability 1-delta.
+            Each h_i(x) is applied to the entire horizon and needs to return an array
+            of size [o,M,N]. Must contain only jax compatible functions.
+        input_constraints: tuple or list of input constraint functions c_i(u), which
+            the optimisation will make satisfy c_i(u) > 0. Each c_i(u) is applied to
+            the entire horizon and needs to return an array of size [1,M,N].
+            Must contain only jax compatible functions.
+        N: the horizon (must be input to avoid dynamic sizing of arrays)
+
+    returns the cost
+
+    """
+
+    # todo: allow for u to be more than a scalar
+    # todo: different desired states for each timestep
+    # todo: allow for different deltas for different constraints or timesteps
+    # todo: test what happens if we have zero input constraints
+    # todo: test what happens if we have zero state constraints
 
     print('Compiling log barrier cost')
     ncu = len(input_constraints)    # number of input constraints
     ncx = len(state_constraints)    # number of state constraints
 
     o = w.shape[0]
-    uc = jnp.reshape(z[:N], (o, -1))                # control input variables  #,
+    uc = jnp.reshape(z[:N], (1, -1))                # control input variables  #,
     epsilon = z[N:N+ncx*N]                          # slack variables on state constraint probabilities
 
     u = jnp.hstack([ut, uc]) # u_t was already performed, so uc is the next N control actions
@@ -38,10 +90,77 @@ def log_barrier_cost(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, gamma, si
 
 def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_star, sqc, src, delta, simulate,
                             state_constraints, input_constraints, verbose=True, max_iter=1000, gamma=1.0, mu=1e4,
-                            epsilon0=1.0, s0=10.0):
+                            epsilon0=1.0):
+    """
+    Solves the MPC problem with chance state constraints and regular input constraints given
+    a log barrier formulation of the cost function
 
-    [o,N] = uc0.shape
+    Definitions:
+        o: number of states
+        N: horizon we wish to optimise the control inputs over
+        M: number of samples in the Monte Carlo approximation
+        ncx: number of state constraints (each state constraint is applied over the entire horizon)
+        ncu: number of input constraints (each input constraint is applied over the entire horizon)
 
+    Inputs
+        uc0: Starting values for the optimisation of the inputs (must be feasible) size [1,N]
+        cost: compiled version of log_barrier_cost
+        gradient: compiled gradient of log_barrier_cost function
+        hessian: compiled hessian of log_barrier_cost function
+        ut: control action applied at current time t, that takes current state x_t to next state x_t
+            has size [1,1] or [1,]
+        xt: current state
+        x_star: desired state - array of size [o,] or [o,1]
+        theta: dictionary of model parameters
+        w: process noise - array of size [o,M,N+1]
+        sqc: square root of the state error weighting matrix - size [o,o]
+        src: square root of the input weighting matrix - size [1,1]
+        delta: target maximum probability of state constraint violation - scalar
+        mu: log barrier parameter - scalar
+        gamma: sigmoid indicator function approximation parameter - scalar
+        simulate: function to simulate the evolution of the systems states
+            matching template
+            def simulate(xt, u, w, theta)
+                return array of size [o,M,N] containing x_{t+1},...,x_{t+1+N}
+            where u = [ut,uc]
+            Must contain only jax compatible functions.
+        state_constraints: tuple or list of state constraint functions h_i(x), which
+            the optimisation will satisfy h_i(x) > 0 with probability 1-delta.
+            Each h_i(x) is applied to the entire horizon and needs to return an array
+            of size [o,M,N]. Must contain only jax compatible functions.
+        input_constraints: tuple or list of input constraint functions c_i(u), which
+            the optimisation will make satisfy c_i(u) > 0. Each c_i(u) is applied to
+            the entire horizon and needs to return an array of size [1,M,N].
+            Must contain only jax compatible functions.
+        verbose [optional, default=True]: If true, displays start and exit condition,
+            if verbose==2, displays iteration information
+            if verbose==0 or False, runs silently
+        max_iter [optional, default=1e4]: maximum number of iterations
+        mu [optional, default=1e3]: starting value for parameter of log barrier function
+        gamma [optional, default=1.0]: starting value for parameter of sigmoid function
+        epsilon0 [optional, default=1.0]: starting value for chance state constraint slack
+            variables
+
+    returns result dict containing:
+        'uc': optimised input actions
+        'epsilon': the chance state constraint slack variables
+        'status': exit condition
+            status==0: termination criteria satisfied and all constraints satisfied
+            status=1: termination criteria satisfied but desired prbability of
+                    state constraint not achieved
+            status=2: termination criteria satisfied but input constraints violated
+            status=3: termination criteria not satisfied could not find an alpha value
+                    to give a valid line search result.
+        'gamma':final value of the gamma parameter,
+        'mu':final value of the mu parameter,
+        'gradient': gradient of the log barrier cost function on completion,
+        'hessian': hessian of the log barrier cost function on completion,
+        'newton_decrement': calculated as np.dot(g,p)
+
+    """
+    print('Starting optimisation')
+
+    o,N = w.shape[0],w.shape[2]-1
     ncu = len(input_constraints)  # number of input constraints
     ncx = len(state_constraints)  # number of state constraints
 
@@ -123,6 +242,7 @@ def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_st
         if (cx < (1-delta-1e-4)).any():
             if verbose:
                 print("State constraints not satisfied with desired probability")
+                print("Lowest state constraint satisfaction probability of ", cx.min())
             status=1
         if (cu < 1e-8).any():
             status=2
@@ -150,7 +270,8 @@ def log_barrier_cost2(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, gamma, s
     ncx = len(state_constraints)    # number of state constraints
 
     o = w.shape[0]
-    uc = jnp.reshape(z[:N], (o, -1))                # control input variables  #,
+    # todo: allow for u to be more than a scalar
+    uc = jnp.reshape(z[:N], (1, -1))                # control input variables  #,
     epsilon = z[N:N+ncx*N]                          # slack variables on state constraint probabilities
     s = z[N+ncx*N:N+ncx*N + ncu * N]                # slack variables on input constraints
 
@@ -172,7 +293,7 @@ def solve_chance_logbarrier2(uc0, cost, gradient, hessian, ut, xt, theta, w, x_s
                             state_constraints, input_constraints, verbose=True, max_iter=1000, gamma=1.0, mu=1e4,
                             epsilon0=1.0, s0=10.0):
 
-    [o,N] = uc0.shape
+    o,N = w.shape[0],w.shape[2]
 
     ncu = len(input_constraints)  # number of input constraints
     ncx = len(state_constraints)  # number of state constraints
@@ -256,6 +377,7 @@ def solve_chance_logbarrier2(uc0, cost, gradient, hessian, ut, xt, theta, w, x_s
         if (cx < (1-delta-1e-4)).any():
             if verbose:
                 print("State constraints not satisfied with desired probability")
+                print("Lowest state constraint satisfaction probability of ", cx.min())
             status=1
         if (cu < 1e-8).any():
             status=2
