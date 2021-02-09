@@ -148,67 +148,63 @@ stan_data = {
     'T':1.0
 }
 
-fit = model.sampling(data=stan_data, warmup=1000, iter=2000)
+fit = model.sampling(data=stan_data, warmup=1000, iter=1100)
 traces = fit.extract()
 
-# # state samples
-# z1 = traces['z1']
-# z2 = traces['z2']
+# state samples
+z_samps = np.transpose(traces['z'],(1,0,2)) # Ns, Nx, T --> Nx, Ns, T
 
-# # parameter samples
-# a11 = traces['a11']
-# a12 = traces['a12']
-# a21 = traces['a21']
-# a22 = traces['a22']
-# b2 = traces['b2']
-# r = traces['r']
-# q11 = traces['q11']
-# q22 = traces['q22']
 
-# # plot the initial parameter marginal estimates
-# plot_trace(a11,8,1,'a11')
-# plot_trace(a12,8,2,'a12')
-# plot_trace(a21,8,3,'a21')
-# plot_trace(a22,8,4,'a22')
-# plt.title('HMC inferred parameters')
-# plot_trace(b2,8,5,'b2')
-# plot_trace(r,8,6,'r')
-# plot_trace(q11,8,7,'q11')
-# plot_trace(q22,8,8,'q22')
-# plt.show()
+# parameter samples
+m_samps = traces['m']
+k_samps = traces['k']
+b_samps = traces['b']
+q_samps = np.transpose(traces['q'],(1,0)) 
+r_samps = np.transpose(traces['r'],(1,0))
 
-# # plot some of the initial marginal state estimates
-# for i in range(4):
-#     if i==1:
-#         plt.title('HMC inferred state z1')
-#     plt.subplot(2,2,i+1)
-#     plt.hist(z1[:, i*20+1],bins=30, label='p(x[1]_'+str(i+1)+'|y_{1:T})', density=True)
-#     plt.axvline(x1[i*20+1], label='True', linestyle='--',color='k',linewidth=2)
-#     plt.xlabel('x[1]_'+str(i+1))
-# plt.tight_layout()
-# plt.legend()
-# plt.show()
+# plot the initial parameter marginal estimates
+z1plt = z_samps[0,:].flatten()
+q1plt = q_samps[0,:].flatten()
+q2plt = q_samps[1,:].flatten()
+r1plt = r_samps[0,:].flatten()
+r2plt = r_samps[1,:].flatten()
 
-# # downsample the the HMC output since for illustration purposes we sampled > M
-# ind = np.random.choice(len(a11), M, replace=False)
-# a11 = a11[ind]  # same indices for all to ensure they correpond to the same realisation from dist
-# a12 = a12[ind]
-# a21 = a21[ind]
-# a22 = a22[ind]
-# b2 = b2[ind]
-# q11 = q11[ind]
-# q22 = q22[ind]
+
+plot_trace(m_samps,2,4,1,'m')
+plt.title('HMC inferred parameters')
+plot_trace(k_samps,2,4,2,'k')
+plot_trace(b_samps,2,4,3,'b')
+plot_trace(q1plt,2,4,4,'q1')
+plot_trace(q2plt,2,4,5,'q2')
+plot_trace(r1plt,2,4,6,'r1')
+plot_trace(r2plt,2,4,7,'r2')
+plt.show()
+
+# plot some of the initial marginal state estimates
+for i in range(4):
+    if i==1:
+        plt.title('HMC inferred position')
+    plt.subplot(2,2,i+1)
+    plt.hist(z[0, i*20+1],bins=30, label='p(x_'+str(i+1)+'|y_{1:T})', density=True)
+    plt.axvline(z[0,i*20+1], label='True', linestyle='--',color='k',linewidth=2)
+    plt.xlabel('x_'+str(i+1))
+plt.tight_layout()
+plt.legend()
+plt.show()
+
+
+# downsample the the HMC output since for illustration purposes we sampled > M
+# ind = np.random.choice(len(a), M, replace=False)
+# a = a[ind]  # same indices for all to ensure they correpond to the same realisation from dist
+# b = b[ind]
+# q = q[ind]
 # r = r[ind]
 
-# # TODO: graceful handling of dimension two
-# xt1 = z1[ind, -1]  # inferred state for current time step
-# xt2 = z2[ind, -1]
+# xt = np.expand_dims(z[ind, -1],0)  # inferred state for current time step
 
 # # we also need to sample noise
-# w1 = col_vec(q11) * np.random.randn(M, N)  # uses the sampled stds
-# w2 = col_vec(q22) * np.random.randn(M, N)
-# ut = u[-1]      # control action that was just applied
-
+# w = np.expand_dims(col_vec(q) * np.random.randn(M, N+1), 0)  # uses the sampled stds, need to sample for x_t to x_{t+N+1}
+# ut = np.expand_dims(np.array([u[-1]]), 0)      # control action that was just applied
 
 
 # ----- Solve the MC MPC control problem ------------------#
@@ -277,7 +273,7 @@ else:
     testgrad = gradient(z0, *args, N)
     testhessian = hessian(z0, *args, N)
 
-    max_iter = 1000
+    max_iter = 100
 
     z = np.hstack([np.zeros((N-1,)), np.ones((N-1,))]) 
     mu = 1e4

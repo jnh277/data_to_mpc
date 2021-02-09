@@ -95,7 +95,7 @@ def generate_data(no_obs, a, b, sigmae):
     return y, u, Phi
 
 
-def plot_trace(param,num_plots,pos, param_name='parameter',save=False):
+def plot_trace(param,row,col,pos, param_name='parameter',save=False):
     """Plot the trace and posterior of a parameter."""
 
     # Summary statistics
@@ -104,7 +104,7 @@ def plot_trace(param,num_plots,pos, param_name='parameter',save=False):
     cred_min, cred_max = np.percentile(param, 2.5), np.percentile(param, 97.5)
 
     # Plotting
-    plt.subplot(num_plots, 1, pos)
+    plt.subplot(col, row, pos)
     plt.hist(param, 30, density=True);
     sns.kdeplot(param, shade=True)
     plt.xlabel(param_name)
