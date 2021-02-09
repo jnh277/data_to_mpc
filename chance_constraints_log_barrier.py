@@ -21,6 +21,10 @@ Uses custom newton method to solve
 Uses JAX to compile and run code on GPU/CPU and provide gradients and hessians
 """
 
+## TODO list
+# refactor the parameters a little bit to put them into a dictionary, so that the same function can be used for the ssm simulator and the jax mpc simulator
+
+
 # general imports
 from numpy.core.numeric import zeros_like
 import pystan
@@ -46,13 +50,13 @@ second_order = True
 #----------------- Parameters ---------------------------------------------------#
 
 # Control parameters
-z1_star = 1.0        # desired set point in z1
+z_star = np.array([[1.0],[0.0]],dtype=float)        # desired set point in z1
 Ns = 200             # number of samples we will use for MC MPC
 Nh = 20              # horizonline of MPC algorithm
-qc1 = 1.0            # cost on state error
-qc2 = 1.0
-rc1 = 1.0             # cost on control action
-x1_ub = 1.05         # upper bound constraint on state
+sqc_v = np.array([1.0,1.0],dtype=float)            # cost on state error
+sqc = np.diag(sqc_v)
+src_v = np.array([1.0,1.0],dtype=float)  
+src = np.diag(src_v)            # cost on control action
 
 # simulation parameters
 T = 100             # number of time steps to simulate and record measurements for
@@ -61,7 +65,7 @@ z2_0 = 0.0
 r1_true = 0.1        # measurement noise standard deviation
 r2_true = 0.01
 q1_true = 0.05       # process noise standard deviation
-q2_true = 0.005       # process noise standard deviation
+q2_true = 0.005      # process noise standard deviation
 m_true = 1;
 b_true = 0.7
 k_true = 0.25
@@ -230,6 +234,31 @@ def simulate(xt, u, w, theta):
         x = index_update(x, index[:, :, k+1], a * x[:, :, k] + b * u[:, k] + w[:, :, k])
     return x[:, :, 1:]
 
+def msd_simulate(xt, u, w, theta):
+    m = theta['m']
+    k = theta['k']
+    b = theta['b']
+    [Nx, Ns, Nh] = w.shape
+    Nu = u.shape[0]
+    A = jnp.zeros((Nx,Nx))
+    B = jnp.zeros((Nx,Nu))
+    # A[0,1] = 1.0;
+    A = index_update(A, index[0, 1,:], 1.0)
+    # A[1,0] = -k_true/m_true
+    A = index_update(A, index[1, 0,:], -k*(1.0/m))
+    # A[1,1] = -b_true/m_true
+    A = index_update(A, index[1, 1,:], -b*(1.0/m))
+    # B[1,0] = 1/m_true;
+    B = index_update(B, index[1, 0,:], 1.0/m)
+
+    x = jnp.zeros((Nx, Ns, Nh))
+    # x[:, 0] = xt
+    x = index_update(x, index[:, :, 0], xt)
+    for ii in range(Nh):
+        # x[:, k+1] = a * x[:, k] + b * u[k] + w[:, k]
+        x = index_update(x, index[:, :, k+1], jnp.matmul(A[:,:,k],x[:, :, k]) + jnp.matmul(B[:,:,k] * u[:, k] + w[:, :, k])
+    return x[:, :, 1:]
+
 
 # compile cost and create gradient and hessian functions
 cost = jit(log_barrier_cost, static_argnums=(11,12,13, 14))  # static argnums means it will recompile if N changes
@@ -259,30 +288,30 @@ result = solve_chance_logbarrier(np.zeros((1,N)), cost, gradient, hessian, ut, x
 
 uc = result['uc']
 
-x_mpc = simulate(xt, np.hstack([ut, uc]), w, theta)
-hx = jnp.concatenate([state_constraint(x_mpc[:, :, 1:]) for state_constraint in state_constraints], axis=2)
-cx = np.mean(hx > 0, axis=1)
-cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints],axis=1)
-print('State constraint satisfaction')
-print(cx)
-print('Input constraint satisfaction')
-print(cu >= 0)
-#
-for i in range(6):
-    plt.subplot(2,3,i+1)
-    plt.hist(x_mpc[0,:, i*3], label='MC forward sim')
-    if i==1:
-        plt.title('MPC solution over horizon')
-    plt.axvline(x_star, linestyle='--', color='g', linewidth=2, label='target')
-    plt.axvline(x_ub, linestyle='--', color='r', linewidth=2, label='upper bound')
-    plt.xlabel('t+'+str(i*3+1))
-plt.tight_layout()
-plt.legend()
-plt.show()
+# x_mpc = simulate(xt, np.hstack([ut, uc]), w, theta)
+# hx = jnp.concatenate([state_constraint(x_mpc[:, :, 1:]) for state_constraint in state_constraints], axis=2)
+# cx = np.mean(hx > 0, axis=1)
+# cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints],axis=1)
+# print('State constraint satisfaction')
+# print(cx)
+# print('Input constraint satisfaction')
+# print(cu >= 0)
+# #
+# for i in range(6):
+#     plt.subplot(2,3,i+1)
+#     plt.hist(x_mpc[0,:, i*3], label='MC forward sim')
+#     if i==1:
+#         plt.title('MPC solution over horizon')
+#     plt.axvline(x_star, linestyle='--', color='g', linewidth=2, label='target')
+#     plt.axvline(x_ub, linestyle='--', color='r', linewidth=2, label='upper bound')
+#     plt.xlabel('t+'+str(i*3+1))
+# plt.tight_layout()
+# plt.legend()
+# plt.show()
 
-plt.plot(uc[0,:])
-plt.title('MPC determined control action')
-plt.show()
+# plt.plot(uc[0,:])
+# plt.title('MPC determined control action')
+# plt.show()
 
 
 
