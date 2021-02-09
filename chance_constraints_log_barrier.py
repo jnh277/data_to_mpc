@@ -21,6 +21,7 @@ Uses JAX to compile and run code on GPU/CPU and provide gradients and hessians
 """
 
 # general imports
+from numpy.core.numeric import zeros_like
 import pystan
 import numpy as np
 import matplotlib.pyplot as plt
@@ -42,123 +43,94 @@ second_order = True
 
 #----------------- Parameters ---------------------------------------------------#
 
-if second_order:
-    # Control parameters
-    x1_star = 1.0        # desired set point
-    M = 200             # number of samples we will use for MC MPC
-    N = 20              # horizonline of MPC algorithm
-    qc11 = 1.0            # cost on state error
-    qc22 = 1.0
-    rc = 1.0             # cost on control action
-    x1_ub = 1.05         # upper bound constraint on state
+# Control parameters
+z1_star = 1.0        # desired set point in z1
+M = 200             # number of samples we will use for MC MPC
+N = 20              # horizonline of MPC algorithm
+qc1 = 1.0            # cost on state error
+qc2 = 1.0
+rc1 = 1.0             # cost on control action
+x1_ub = 1.05         # upper bound constraint on state
 
-    # simulation parameters
-    T = 100             # number of time steps to simulate and record measurements for
-    x1_0 = 3.0            # initial x
-    x2_0 = 0.0
-    r_true = 0.1        # measurement noise standard deviation
-    q1_true = 0.05       # process noise standard deviation
-    q2_true = 0.005       # process noise standard deviation
+# simulation parameters
+T = 100             # number of time steps to simulate and record measurements for
+z1_0 = 3.0            # initial x
+z2_0 = 0.0
+r1_true = 0.1        # measurement noise standard deviation
+r2_true = 0.01
+q1_true = 0.05       # process noise standard deviation
+q2_true = 0.005       # process noise standard deviation
+m_true = 1;
+b_true = 0.07
+k_true = 0.25
 
-else:
-    # Control parameters
-    x_star = 1.0        # desired set point
-    M = 200             # number of samples we will use for MC MPC
-    N = 20              # horizonline of MPC algorithm
-    qc = 1.0            # cost on state error
-    rc = 1.             # cost on control action
-    x_ub = 1.05         # upper bound constraint on state
-
-    # simulation parameters
-    T = 100             # number of time steps to simulate and record measurements for
-    x0 = 3.0            # initial x
-    r_true = 0.1        # measurement noise standard deviation
-    q_true = 0.05       # process noise standard deviation
+Nx = 2;
+Ny = 2;
+Nu = 1;
 
 #----------------- Simulate the system-------------------------------------------#
-if second_order:
-    # TODO: simulate better than this
-    def ssm1(x1, x2, u, a11=0.9, a12=0.0, b1=0.0):
-        return a11*x1 + a12*x2 + b1*u
-    def ssm2(x1, x2, u, a21=0.5, a22=-0.5, b2=0.3):
-        return a21*x1 + a22*x2 + b2*u
 
-    x1 = np.zeros(T+1)
-    x2 = np.zeros(T+1)
+# def ssm1(x1, x2, u, T, a11=0.0, a12=1.0, b1=0.0):
+#     return (a11*x1 + a12*x2 + b1*u)*T
+# def ssm2(x1, x2, u, T, a21=0.5, a22=-0.5, b2=0.3):
+#     return a21*x1 + a22*x2 + b2*u
+def ssm_euler(x,u,A,B,T):
+    return (np.matmul(A,x) + np.matmul(B,u)) * T;
 
-    # initial state
-    x1[0] = x1_0 
-    x2[0] = x2_0 
+# SSM equations
+A = np.zeros((Nx,Nx), dtype=float)
+B = np.zeros((Nx,Nu), dtype=float)
 
-    # noise predrawn
-    w1 = np.random.normal(0.0, q1_true, T)
-    w2 = np.random.normal(0.0, q2_true, T)
-
-    # create some inputs that are random but held for 10 time steps
-    u = np.random.uniform(-0.5,0.5, T)
-    u = np.reshape(u, (-1,10))
-    u[:,1:] = np.atleast_2d(u[:,0]).T * np.ones((1,9))
-    u = u.flatten()
-
-    # spicy
-    for k in range(T):
-        x1[k+1] = ssm1(x1[k],x2[k],u[k]) + w1[k]
-        x2[k+1] = ssm2(x1[k],x2[k],u[k]) + w2[k]
-
-    # simulate measurements
-    y = np.zeros(T)
-    y = x1[:T] + np.random.normal(0.0, r_true, T) # measure only state 1
-
-    plt.subplot(2,1,1)
-    plt.plot(u)
-    plt.title('Simulated inputs used for inference')
-    plt.subplot(2, 1, 2)
-    plt.plot(x1)
-    plt.plot(y,linestyle='None',color='r',marker='*')
-    plt.title('Simulated state 1 and measurements used for inferences')
-    plt.tight_layout()
-    plt.show()
+A[0,1] = 1.0;
+A[1,0] = -k_true/m_true
+A[1,1] = -b_true/m_true
+B[1,0] = 1/m_true;
 
 
-else:
-    def ssm(x, u, a=0.9, b=0.1):
-        return a*x + b*u
+z = np.zeros((Nx,T+1), dtype=float) # state history
 
-    x = np.zeros(T+1)
-    x[0] = x0                                   # initial state
-    w = np.random.normal(0.0, q_true, T)        # make a point of predrawing noise
+# initial state
+z[0,0] = z1_0 
+z[1,0] = z2_0 
 
-    # create some inputs that are random but held for 10 time steps
-    u = np.random.uniform(-0.5,0.5, T)
-    u = np.reshape(u, (-1,10))
-    u[:,1:] = np.atleast_2d(u[:,0]).T * np.ones((1,9))
-    u = u.flatten()
+# noise predrawn and independant
+w = np.zeros((Nx,T),dtype=float)
+w[0,:] = np.random.normal(0.0, q1_true, T)
+w[1,:] = np.random.normal(0.0, q2_true, T)
 
-    for k in range(T):
-        x[k+1] = ssm(x[k], u[k]) + w[k]
+# create some inputs that are random but held for 10 time steps
+u = np.random.uniform(-0.5,0.5, T*Nu)
+u = np.reshape(u, (Nu,T))
 
-    # simulate measurements
-    y = np.zeros(T)
-    y = x[:T] + np.random.normal(0.0, r_true, T)
+# spicy
+for k in range(T):
+    # x1[k+1] = ssm1(x1[k],x2[k],u[k]) + w1[k]
+    # x2[k+1] = ssm2(x1[k],x2[k],u[k]) + w2[k]
+    z[:,k+1] = ssm_euler(z[:,k],u[:,k],A,B,1.0) + w[:,k]
 
-    plt.subplot(2,1,1)
-    plt.plot(u)
-    plt.title('Simulated inputs used for inference')
+# simulate measurements
+v = np.zeros((Ny,T), dtype=float)
+v[0,:] = np.random.normal(0.0, r1_true, T)
+v[1,:] = np.random.normal(0.0, r2_true, T)
+y = np.zeros((Ny,T), dtype=float)
+y[0,:] = z[0,:-1]
+y[1,:] = (-k_true*z[0,:-1] -b_true*z[1,:-1] + u[0,:])/m_true
+y = y + v; # add noise
 
-    plt.subplot(2, 1, 2)
-    plt.plot(x)
-    plt.plot(y,linestyle='None',color='r',marker='*')
-    plt.title('Simulated state and measurements used for inferences')
-    plt.tight_layout()
-    plt.show()
+plt.subplot(2,1,1)
+plt.plot(u[0,:])
+plt.plot(y[1,:],linestyle='None',color='r',marker='*')
+plt.title('Simulated inputs and measurement used for inference')
+plt.subplot(2, 1, 2)
+plt.plot(z[0,:])
+plt.plot(y[0,:],linestyle='None',color='r',marker='*')
+plt.title('Simulated state 1 and measurements used for inferences')
+plt.tight_layout()
+plt.show()
 
 #----------- USE HMC TO PERFORM INFERENCE ---------------------------#
 # avoid recompiling
-if second_order:
-    model_name = 'LSSM_O2_demo'
-else:
-    model_name = 'LSSM_demo'
-
+model_name = 'LSSM_O2_MSD_demo'
 path = 'stan/'
 if Path(path+model_name+'.pkl').is_file():
     model = pickle.load(open(path+model_name+'.pkl', 'rb'))
@@ -171,114 +143,71 @@ stan_data = {
     'N':T,
     'y':y,
     'u':u,
+    'O':Nx,
+    'D':Ny,
+    'T':1.0
 }
 
 fit = model.sampling(data=stan_data, warmup=1000, iter=2000)
 traces = fit.extract()
 
-if second_order:
-    # state samples
-    z1 = traces['z1']
-    z2 = traces['z2']
+# # state samples
+# z1 = traces['z1']
+# z2 = traces['z2']
 
-    # parameter samples
-    a11 = traces['a11']
-    a12 = traces['a12']
-    a21 = traces['a21']
-    a22 = traces['a22']
-    b2 = traces['b2']
-    r = traces['r']
-    q11 = traces['q11']
-    q22 = traces['q22']
+# # parameter samples
+# a11 = traces['a11']
+# a12 = traces['a12']
+# a21 = traces['a21']
+# a22 = traces['a22']
+# b2 = traces['b2']
+# r = traces['r']
+# q11 = traces['q11']
+# q22 = traces['q22']
 
-    # plot the initial parameter marginal estimates
-    plot_trace(a11,8,1,'a11')
-    plot_trace(a12,8,2,'a12')
-    plot_trace(a21,8,3,'a21')
-    plot_trace(a22,8,4,'a22')
-    plt.title('HMC inferred parameters')
-    plot_trace(b2,8,5,'b2')
-    plot_trace(r,8,6,'r')
-    plot_trace(q11,8,7,'q11')
-    plot_trace(q22,8,8,'q22')
-    plt.show()
+# # plot the initial parameter marginal estimates
+# plot_trace(a11,8,1,'a11')
+# plot_trace(a12,8,2,'a12')
+# plot_trace(a21,8,3,'a21')
+# plot_trace(a22,8,4,'a22')
+# plt.title('HMC inferred parameters')
+# plot_trace(b2,8,5,'b2')
+# plot_trace(r,8,6,'r')
+# plot_trace(q11,8,7,'q11')
+# plot_trace(q22,8,8,'q22')
+# plt.show()
 
-    # plot some of the initial marginal state estimates
-    for i in range(4):
-        if i==1:
-            plt.title('HMC inferred state z1')
-        plt.subplot(2,2,i+1)
-        plt.hist(z1[:, i*20+1],bins=30, label='p(x[1]_'+str(i+1)+'|y_{1:T})', density=True)
-        plt.axvline(x1[i*20+1], label='True', linestyle='--',color='k',linewidth=2)
-        plt.xlabel('x[1]_'+str(i+1))
-    plt.tight_layout()
-    plt.legend()
-    plt.show()
+# # plot some of the initial marginal state estimates
+# for i in range(4):
+#     if i==1:
+#         plt.title('HMC inferred state z1')
+#     plt.subplot(2,2,i+1)
+#     plt.hist(z1[:, i*20+1],bins=30, label='p(x[1]_'+str(i+1)+'|y_{1:T})', density=True)
+#     plt.axvline(x1[i*20+1], label='True', linestyle='--',color='k',linewidth=2)
+#     plt.xlabel('x[1]_'+str(i+1))
+# plt.tight_layout()
+# plt.legend()
+# plt.show()
 
-    # downsample the the HMC output since for illustration purposes we sampled > M
-    ind = np.random.choice(len(a11), M, replace=False)
-    a11 = a11[ind]  # same indices for all to ensure they correpond to the same realisation from dist
-    a12 = a12[ind]
-    a21 = a21[ind]
-    a22 = a22[ind]
-    b2 = b2[ind]
-    q11 = q11[ind]
-    q22 = q22[ind]
-    r = r[ind]
+# # downsample the the HMC output since for illustration purposes we sampled > M
+# ind = np.random.choice(len(a11), M, replace=False)
+# a11 = a11[ind]  # same indices for all to ensure they correpond to the same realisation from dist
+# a12 = a12[ind]
+# a21 = a21[ind]
+# a22 = a22[ind]
+# b2 = b2[ind]
+# q11 = q11[ind]
+# q22 = q22[ind]
+# r = r[ind]
 
-    # TODO: graceful handling of dimension two
-    xt1 = z1[ind, -1]  # inferred state for current time step
-    xt2 = z2[ind, -1]
+# # TODO: graceful handling of dimension two
+# xt1 = z1[ind, -1]  # inferred state for current time step
+# xt2 = z2[ind, -1]
 
-    # we also need to sample noise
-    w1 = col_vec(q11) * np.random.randn(M, N)  # uses the sampled stds
-    w2 = col_vec(q22) * np.random.randn(M, N)
-    ut = u[-1]      # control action that was just applied
-
-
-else:
-    # state samples
-    z = traces['z']
-
-    # parameter samples
-    a = traces['a']
-    b = traces['b']
-    r = traces['r']
-    q = traces['q']
-
-    # plot the initial parameter marginal estimates
-    plot_trace(a,4,1,'a')
-    plt.title('HMC inferred parameters')
-    plot_trace(b,4,2,'b')
-    plot_trace(r,4,3,'r')
-    plot_trace(q,4,4,'q')
-    plt.show()
-
-    # plot some of the initial marginal state estimates
-    for i in range(4):
-        if i==1:
-            plt.title('HMC inferred states')
-        plt.subplot(2,2,i+1)
-        plt.hist(z[:, i*20+1],bins=30, label='p(x_'+str(i+1)+'|y_{1:T})', density=True)
-        plt.axvline(x[i*20+1], label='True', linestyle='--',color='k',linewidth=2)
-        plt.xlabel('x_'+str(i+1))
-    plt.tight_layout()
-    plt.legend()
-    plt.show()
-
-    # downsample the the HMC output since for illustration purposes we sampled > M
-    ind = np.random.choice(len(a), M, replace=False)
-    a = a[ind]  # same indices for all to ensure they correpond to the same realisation from dist
-    b = b[ind]
-    q = q[ind]
-    r = r[ind]
-
-    xt = z[ind, -1]  # inferred state for current time step
-
-    # we also need to sample noise
-    w = col_vec(q) * np.random.randn(M, N)  # uses the sampled stds
-    ut = u[-1]      # control action that was just applied
-
+# # we also need to sample noise
+# w1 = col_vec(q11) * np.random.randn(M, N)  # uses the sampled stds
+# w2 = col_vec(q22) * np.random.randn(M, N)
+# ut = u[-1]      # control action that was just applied
 
 
 
