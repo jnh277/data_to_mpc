@@ -13,7 +13,8 @@ with a given probability.
 
 Current set up: Uses MC to give an expected cost and then satisfies,
 Chance state constraints using a log barrier formulation
-No input constraints currently in place
+Chance state constraints using a log barrier formulation
+Input constraints using a log barrier formulation
 
 Implementation:
 Uses custom newton method to solve
@@ -28,17 +29,19 @@ import matplotlib.pyplot as plt
 from helpers import plot_trace, col_vec, row_vec
 from pathlib import Path
 import pickle
-from scipy.optimize import minimize
 
 # jax related imports
-from jax.lax import dynamic_slice
 import jax.numpy as jnp
 from jax import grad, jit, device_put, jacfwd, jacrev
 from jax.ops import index, index_add, index_update
 from jax.config import config
-from jax.scipy.special import expit
+
+# optimisation module imports (needs to be done before the jax confix update)
+from optimisation import log_barrier_cost, solve_chance_logbarrier
+
 config.update("jax_enable_x64", True)           # run jax in 64 bit mode for accuracy
 
+<<<<<<< HEAD
 second_order = True
 
 #----------------- Parameters ---------------------------------------------------#
@@ -67,6 +70,22 @@ k_true = 0.25
 Nx = 2;
 Ny = 2;
 Nu = 1;
+=======
+
+
+# Control parameters
+x_star = np.array([[1.0]])        # desired set point
+M = 200             # number of samples we will use for MC MPC
+N = 20              # horizonline of MPC algorithm
+sqc = np.array([[1.0]])            # square root cost on state error
+src = np.array([[1.0]])             # square root cost on control action
+
+# simulation parameters
+T = 100             # number of time steps to simulate and record measurements for
+x0 = 3.0            # initial x
+r_true = 0.01       # measurement noise standard deviation
+q_true = 0.05       # process noise standard deviation
+>>>>>>> efea70b0da4381dd8c8753348996c294f165c352
 
 #----------------- Simulate the system-------------------------------------------#
 
@@ -214,154 +233,75 @@ ut = np.expand_dims(u[:,-1], axis=1)      # control action that was just applied
 # q,r *_mpc are [Nx/y,Ns]. Don't know why!
 
 # ----- Solve the MC MPC control problem ------------------#
-if second_order:
-    # i should really avoid code duplication but i can feel it happening shortly
-    print("2D MPC not done yet")
-else:
-    # jax compatible version of function to simulate forward a sample / scenario
-    def simulate(xt, u, a, b, w_sim):
-        N = len(u)
-        M = len(a)
-        x = jnp.zeros((M, N+1))
-        # x[:, 0] = xt
-        x = index_update(x, index[:,0], xt)
-        for k in range(N):
-            # x[:, k+1] = a * x[:, k] + b * u[k] + w_sim[:, k]
-            x = index_update(x, index[:, k+1], a * x[:, k] + b * u[k] + w_sim[:, k])
-        return x[:, 1:]
 
-    #
-    def logbarrier(z_sim, mu):       # log barrier for the constraint z_sim >= 0
-        return jnp.sum(-mu * jnp.log(z_sim))
-
-    def chance_constraint(x, s, x_ub, gamma, delta):    # upper bounded chance constraint on the state
-        return jnp.mean(expit((x_ub - x) / gamma), axis=0) - (1 - s)     # take the sum over the samples (M)
-
-    # jax compatible version of function to compute cost
-    def cost(z_sim, ut, xt, x_star, a, b, w_sim, qc, rc, mu, gamma, x_ub, delta, N):
-        # uc is given by z_sim[:(N-1)]
-        # epsilon is given by z_sim[(N-1):2(N-1)]
-        # other slack variables could go after this
-
-        uc = z_sim[:(N-1)]              # control input variables  #
-        epsilon = z_sim[19:]               # slack variables
-
-        u = jnp.hstack([ut, uc]) # u_t was already performed, so uc is N-1
-        x = simulate(xt, u, a, b, w_sim)
-        # state error and input penalty cost and cost that drives slack variables down
-        V1 = jnp.sum((qc*(x - x_star)) ** 2) + jnp.sum((rc * uc)**2) + jnp.sum(10 * (epsilon + 1e3)**2)
-        # need a log barrier on each of the slack variables to ensure they are positve
-        V2 = logbarrier(epsilon - delta, mu)       # aiming for 1-delta% accuracy
-        # now the chance constraints
-        cx = chance_constraint(x[:,1:], epsilon, x_ub, gamma, delta)
-        V3 = logbarrier(cx, mu)
-        return V1 + V2 + V3
-
-    # compile cost and create gradient and hessian functions
-    cost_jit = jit(cost, static_argnums=(13,))  # static argnums means it will recompile if N changes
-    gradient = jit(grad(cost, argnums=0), static_argnums=(13,))    # get compiled function to return gradients with respect to z_sim (uc, s)
-    hessian = jit(jacfwd(jacrev(cost, argnums=0)), static_argnums=(13,))
-
-    # define some optimisation settings
-    mu = 1e4
-    gamma = 1
-    x_ub = 1
-    delta = 0.01
-
-    # put everything we want to call onto the gpu
-    args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
-            device_put(b), device_put(w_sim), device_put(qc), device_put(rc),
-            device_put(mu), device_put(gamma), device_put(x_ub), device_put(delta))
-
-    # test
-    z0 = jnp.hstack([jnp.zeros((N-1)), np.ones((N-1,))])
-    test = cost_jit(z0, *args, N)
-    testgrad = gradient(z0, *args, N)
-    testhessian = hessian(z0, *args, N)
-
-    max_iter = 100
-
-    z_sim = np.hstack([np.zeros((N-1,)), np.ones((N-1,))]) 
-    mu = 1e4
-    gamma = 1.0
-    args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
-            device_put(b), device_put(w_sim), device_put(qc), device_put(rc),
-            device_put(mu), device_put(gamma), device_put(x_ub), device_put(delta))
-
-    for i in range(max_iter):
-        # compute cost, gradient, and hessian
-        jz = device_put(z_sim)
-        c = np.array(cost_jit(jz, *args, N))
-        g = np.array(gradient(jz, *args, N))
-        h = np.array(hessian(jz, *args, N))
-
-        # compute search direction
-        p = - np.linalg.solve(h, g)
-        # check that we have a valid search direction and if not then fix
-        # TODO: make this less hacky (look at slides)
-        beta2 = 1e-8
-        while np.dot(p,g) > 0:
-            p = - np.linalg.solve((h + beta2 * np.eye(h.shape[0])),g)
-            beta2 = beta2 * 2
-
-        # perform line search
-        alpha = 1.0
-        for k in range(52):
-            # todo: (lower priority) need to use the wolfe conditions to ensure a bit of a better decrease
-            ztest = z_sim + alpha * p
-            ctest = np.array(cost_jit(device_put(ztest), *args, N))
-            # if np.isnan(ctest) or np.isinf(ctest):
-            #     continue
-            # nan and inf checks should be redundant
-            if ctest < c:
-                z_sim = ztest
-                break
-
-            alpha = alpha / 2
-
-        if k == 51:
-            print('Failed line search')
-            break
-
-        print('Iter:', i+1, 'Cost: ', c, 'nd:',np.dot(g,p),'alpha: ', alpha, 'mu: ', mu, 'gamma: ', gamma)
-
-        if np.abs(np.dot(g,p)) < 1e-2: # if search direction was really small, then decrease mu and s for next iteration
-            if mu < 1e-6 and gamma < 1e-3:
-                break   # termination criteria satisfied
-
-            mu = max(mu / 2, 0.999e-6)
-            gamma = max(gamma / 1.25, 0.999e-3)
-            # need to adjust the slack after changing gamma
-            x_new = simulate(xt, np.hstack([ut, z_sim[:N-1]]), a, b, w_sim)
-            cx = chance_constraint(x_new[:, 1:], z_sim[N-1:], x_ub, gamma, delta)
-            tmp = -np.minimum(cx, 0)+1e-5
-            z_sim[N-1:] += -np.minimum(cx, 0)+1e-6
-            args = (device_put(ut), device_put(xt), device_put(x_star), device_put(a),
-                    device_put(b), device_put(w_sim), device_put(qc), device_put(rc),
-                    device_put(mu), device_put(gamma), device_put(x_ub), device_put(delta))
+# jax compatible version of function to simulate forward the samples / scenarios
+def simulate(xt, u, w, theta):
+    a = theta['a']
+    b = theta['b']
+    [o, M, N] = w.shape
+    x = jnp.zeros((o, M, N+1))
+    # x[:, 0] = xt
+    x = index_update(x, index[:, :,0], xt)
+    for k in range(N):
+        # x[:, k+1] = a * x[:, k] + b * u[k] + w[:, k]
+        x = index_update(x, index[:, :, k+1], a * x[:, :, k] + b * u[:, k] + w[:, :, k])
+    return x[:, :, 1:]
 
 
-    x_mpc = simulate(xt, np.hstack([ut, z_sim[:N-1]]), a, b, w_sim)
-    cx = chance_constraint(x_mpc, 0.0, x_ub, gamma, delta)
-    print('Constraint satisfaction')
-    print(1 + cx)
-    #
-    for i in range(6):
-        plt.subplot(2,3,i+1)
-        plt.hist(x_mpc[:, i*3], label='MC forward sim')
-        if i==1:
-            plt.title('MPC solution over horizon')
-        plt.axvline(1.0, linestyle='--', color='g', linewidth=2, label='target')
-        plt.xlabel('t+'+str(i*3+1))
-    plt.tight_layout()
-    plt.legend()
-    plt.show()
+# compile cost and create gradient and hessian functions
+cost = jit(log_barrier_cost, static_argnums=(11,12,13, 14))  # static argnums means it will recompile if N changes
+gradient = jit(grad(log_barrier_cost, argnums=0), static_argnums=(11, 12, 13, 14))    # get compiled function to return gradients with respect to z (uc, s)
+hessian = jit(jacfwd(jacrev(log_barrier_cost, argnums=0)), static_argnums=(11, 12, 13, 14))
 
-    plt.plot(z_sim[:N-1])
-    plt.title('MPC determined control action')
-    plt.show()
 
-print("Finito")
+# define some optimisation settings
+mu = 1e4
+gamma = 1
+delta = 0.05
+max_iter = 1000
+
+
+# define some state constraints, (these need to be tuples (so trailing comma))
+x_ub = 1.25
+state_constraints = (lambda x: x_ub - x,)
+input_constraints = (lambda u: 5.0 - u,)
+
+theta = {'a':a,
+         'b':b,}
+
+
+# solve mpc optimisation problem
+result = solve_chance_logbarrier(np.zeros((1,N)), cost, gradient, hessian, ut, xt, theta, w, x_star, sqc, src,
+                            delta, simulate, state_constraints, input_constraints)
+
+uc = result['uc']
+
+x_mpc = simulate(xt, np.hstack([ut, uc]), w, theta)
+hx = jnp.concatenate([state_constraint(x_mpc[:, :, 1:]) for state_constraint in state_constraints], axis=2)
+cx = np.mean(hx > 0, axis=1)
+cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints],axis=1)
+print('State constraint satisfaction')
+print(cx)
+print('Input constraint satisfaction')
+print(cu >= 0)
+#
+for i in range(6):
+    plt.subplot(2,3,i+1)
+    plt.hist(x_mpc[0,:, i*3], label='MC forward sim')
+    if i==1:
+        plt.title('MPC solution over horizon')
+    plt.axvline(x_star, linestyle='--', color='g', linewidth=2, label='target')
+    plt.axvline(x_ub, linestyle='--', color='r', linewidth=2, label='upper bound')
+    plt.xlabel('t+'+str(i*3+1))
+plt.tight_layout()
+plt.legend()
+plt.show()
+
+plt.plot(uc[0,:])
+plt.title('MPC determined control action')
+plt.show()
+
+
 
 
 
