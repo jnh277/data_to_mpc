@@ -41,7 +41,6 @@ from optimisation import log_barrier_cost, solve_chance_logbarrier
 
 config.update("jax_enable_x64", True)           # run jax in 64 bit mode for accuracy
 
-<<<<<<< HEAD
 second_order = True
 
 #----------------- Parameters ---------------------------------------------------#
@@ -70,22 +69,6 @@ k_true = 0.25
 Nx = 2;
 Ny = 2;
 Nu = 1;
-=======
-
-
-# Control parameters
-x_star = np.array([[1.0]])        # desired set point
-M = 200             # number of samples we will use for MC MPC
-N = 20              # horizonline of MPC algorithm
-sqc = np.array([[1.0]])            # square root cost on state error
-src = np.array([[1.0]])             # square root cost on control action
-
-# simulation parameters
-T = 100             # number of time steps to simulate and record measurements for
-x0 = 3.0            # initial x
-r_true = 0.01       # measurement noise standard deviation
-q_true = 0.05       # process noise standard deviation
->>>>>>> efea70b0da4381dd8c8753348996c294f165c352
 
 #----------------- Simulate the system-------------------------------------------#
 
