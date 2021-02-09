@@ -261,22 +261,25 @@ def msd_simulate(xt, u, w, theta):
 
 
 # compile cost and create gradient and hessian functions
-cost = jit(log_barrier_cost, static_argnums=(11,12,13, 14))  # static argnums means it will recompile if N changes
-gradient = jit(grad(log_barrier_cost, argnums=0), static_argnums=(11, 12, 13, 14))    # get compiled function to return gradients with respect to z (uc, s)
-hessian = jit(jacfwd(jacrev(log_barrier_cost, argnums=0)), static_argnums=(11, 12, 13, 14))
+cost = jit(log_barrier_cost, static_argnums=(11,12,13, 14, 15))  # static argnums means it will recompile if N changes
+gradient = jit(grad(log_barrier_cost, argnums=0), static_argnums=(11, 12, 13, 14, 15))    # get compiled function to return gradients with respect to z (uc, s)
+hessian = jit(jacfwd(jacrev(log_barrier_cost, argnums=0)), static_argnums=(11, 12, 13, 14, 15))
 
 
 # define some optimisation settings
 mu = 1e4
 gamma = 1
 delta = 0.05
+# delta = np.linspace(0.05,0.2,N)     # varying the requried probabilistic satisfaction
 max_iter = 1000
 
 
 # define some state constraints, (these need to be tuples (so trailing comma))
-x_ub = 1.25
+x_ub = 1.2
 state_constraints = (lambda x: x_ub - x,)
+# state_constraints = ()
 input_constraints = (lambda u: 5.0 - u,)
+# input_constraints = ()
 
 theta = {'a':a,
          'b':b,}
@@ -288,14 +291,16 @@ result = solve_chance_logbarrier(np.zeros((1,N)), cost, gradient, hessian, ut, x
 
 uc = result['uc']
 
-# x_mpc = simulate(xt, np.hstack([ut, uc]), w, theta)
-# hx = jnp.concatenate([state_constraint(x_mpc[:, :, 1:]) for state_constraint in state_constraints], axis=2)
-# cx = np.mean(hx > 0, axis=1)
-# cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints],axis=1)
-# print('State constraint satisfaction')
-# print(cx)
-# print('Input constraint satisfaction')
-# print(cu >= 0)
+# if len(state_constraints) > 0:
+#     x_mpc = simulate(xt, np.hstack([ut, uc]), w, theta)
+#     hx = np.concatenate([state_constraint(x_mpc[:, :, 1:]) for state_constraint in state_constraints], axis=2)
+#     cx = np.mean(hx > 0, axis=1)
+#     print('State constraint satisfaction')
+#     print(cx)
+# if len(input_constraints) > 0:
+#     cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints],axis=1)
+#     print('Input constraint satisfaction')
+#     print(cu >= 0)
 # #
 # for i in range(6):
 #     plt.subplot(2,3,i+1)
