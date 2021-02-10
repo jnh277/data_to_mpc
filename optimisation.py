@@ -75,6 +75,7 @@ def log_barrier_cost(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, gamma, si
     epsilon = z[Nu*N:N*Nu+ncx*N]                        # slack variables on state constraints
     u = jnp.hstack([jnp.reshape(ut,(-1,1)), uc]) # u_t was already performed, so uc is the next N control actions
     x = simulate(xt, u, w, theta)
+
     # state error and input penalty cost and cost that drives slack variables down
     V1 = jnp.sum(jnp.matmul(sqc,jnp.reshape(x[:,:,1:] - jnp.reshape(x_star,(o,1,-1)),(o,-1))) ** 2) + jnp.sum(jnp.matmul(src, uc)**2) + jnp.sum(300 * (epsilon + 1e3)**2)
     # need a log barrier on each of the slack variables to ensure they are positve
@@ -165,7 +166,7 @@ def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_st
 
     """
     print('Starting optimisation')
-
+    status = 5
     o,N = w.shape[0],w.shape[2]-1
     Nu = uc0.shape[0]             # input dimension
     ncu = len(input_constraints)  # number of input constraints
@@ -191,12 +192,12 @@ def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_st
         # calculate newton decrement
         nd = np.dot(p,g)
         # check that we have a valid search direction and if not then fix
-        # TODO: make this less hacky (look at slides)
-        beta2 = 1e-8
-        while nd >= 0:
-            p = - np.linalg.solve((h + beta2 * np.eye(h.shape[0])), g)
-            beta2 = beta2 * 2
-            nd = np.dot(p, g)
+        if nd <= 0:
+            [d, v] = np.linalg.eig(h)
+            ind = d < 1e-7
+            d[ind] = 1e-7 + np.abs(d[ind])
+            hn = v @ np.diag(d) @ v.T
+            p = - np.linalg.solve(hn, g)
 
         # perform line search
         alpha = 1.0
