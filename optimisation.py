@@ -47,7 +47,7 @@ def log_barrier_cost(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, gamma, si
         simulate: function to simulate the evolution of the systems states
             matching template
             def simulate(xt, u, w, theta)
-                return array of size [o,M,N] containing x_{t+1},...,x_{t+1+N}
+                return array of size [o,M,N+1] containing x_{t+1},...,x_{t+1+N}
             where u = [ut,uc]
             Must contain only jax compatible functions.
         state_constraints: tuple or list of state constraint functions h_i(x), which
@@ -73,12 +73,9 @@ def log_barrier_cost(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, gamma, si
     o = w.shape[0]
     uc = jnp.reshape(z[:Nu*N], (Nu, N))              # control input variables  #,
     epsilon = z[Nu*N:N*Nu+ncx*N]                        # slack variables on state constraints
-    if ut.ndim != 2:
-        ut = jnp.expand_dims(ut, axis=1) # expand if tuple
-    u = jnp.hstack([ut, uc]) # u_t was already performed, so uc is the next N control actions
+    u = jnp.hstack([jnp.reshape(ut,(-1,1)), uc]) # u_t was already performed, so uc is the next N control actions
     x = simulate(xt, u, w, theta)
     # state error and input penalty cost and cost that drives slack variables down
-    # potentially np.reshape(x_star,(o,1,-1))??
     V1 = jnp.sum(jnp.matmul(sqc,jnp.reshape(x[:,:,1:] - jnp.reshape(x_star,(o,1,-1)),(o,-1))) ** 2) + jnp.sum(jnp.matmul(src, uc)**2) + jnp.sum(300 * (epsilon + 1e3)**2)
     # need a log barrier on each of the slack variables to ensure they are positve
     V2 = logbarrier(epsilon - delta, mu)     # aiming for 1-delta% accuracy
@@ -129,7 +126,7 @@ def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_st
         simulate: function to simulate the evolution of the systems states
             matching template
             def simulate(xt, u, w, theta)
-                return array of size [o,M,N] containing x_{t+1},...,x_{t+1+N}
+                return array of size [o,M,N+1] containing x_{t+1},...,x_{t+1+N}
             where u = [ut,uc]
             Must contain only jax compatible functions.
         state_constraints: tuple or list of state constraint functions h_i(x), which

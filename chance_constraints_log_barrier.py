@@ -55,8 +55,9 @@ Ns = 200             # number of samples we will use for MC MPC
 Nh = 20              # horizonline of MPC algorithm
 sqc_v = np.array([1.0,1.0],dtype=float)            # cost on state error
 sqc = np.diag(sqc_v)
-src_v = np.array([1.0,1.0],dtype=float)  
-src = np.diag(src_v)            # cost on control action
+# src_v = np.array([1.0,1.0],dtype=float)
+# src = np.diag(src_v)            # cost on control action
+src = np.array([[1.0]])
 
 # simulation parameters
 T = 100             # number of time steps to simulate and record measurements for
@@ -268,7 +269,7 @@ max_iter = 1000
 
 # define some state constraints, (these need to be tuples (so trailing comma))
 z_ub = jnp.array([[1.2],[jnp.inf]])
-state_constraints = (lambda z: z_ub - z,)
+state_constraints = (lambda z: np.expand_dims(z_ub,2) - z,)
 # state_constraints = ()
 input_constraints = (lambda u: 5.0 - u,)
 # input_constraints = ()
