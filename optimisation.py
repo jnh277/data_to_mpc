@@ -193,12 +193,13 @@ def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_st
         # calculate newton decrement
         nd = np.dot(p,g)
         # check that we have a valid search direction and if not then fix
-        # TODO: make this less hacky (look at slides)
-        beta2 = 1e-8
-        while nd >= 0:
-            p = - np.linalg.solve((h + beta2 * np.eye(h.shape[0])), g)
-            beta2 = beta2 * 2
-            nd = np.dot(p, g)
+        if nd <= 0:
+            [d, v] = np.linalg.eig(h)
+            ind = d < 1e-7
+            d[ind] = 1e-7 + np.abs(d[ind])
+            hn = v @ np.diag(d) @ v.T
+            p = - np.linalg.solve(hn, g)
+            nd = np.dot(p,g)
 
         # perform line search
         alpha = 1.0
