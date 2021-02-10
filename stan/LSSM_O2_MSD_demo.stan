@@ -41,8 +41,8 @@ model {
     z[2,1] ~ normal(0,0.05); // small prior on velocity (going to start the sim with zero speed every time)
    
     // state likelihood (apparently much better to do univariate sampling twice)
-    z[1,2:N] ~ normal(T*z[2,1:N-1], q[1]);
-    z[2,2:N] ~ normal(-(k*T/m)*z[1,1:N-1] + -(b*T/m)*z[2,1:N-1] + (T/m)*u[1,1:N-1], q[2]); // input affects second state only
+    z[1,2:N] ~ normal(z[1,1:N-1] + T*z[2,1:N-1], q[1]);
+    z[2,2:N] ~ normal(z[2,1:N-1] + -(k*T/m)*z[1,1:N-1] + -(b*T/m)*z[2,1:N-1] + (T/m)*u[1,1:N-1], q[2]); // input affects second state only
     // measurement likelihood
     y[1,:] ~ normal(z[1,:], r[1]); // measurement of first state only
     y[2,:] ~ normal(-(k/m)*z[1,1:N] - (b/m)*z[2,1:N] + u[1,:]/m, r[2]); // acceleration measurement?

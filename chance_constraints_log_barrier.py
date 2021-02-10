@@ -113,7 +113,7 @@ u = np.reshape(u, (Nu,T))
 for k in range(T):
     # x1[k+1] = ssm1(x1[k],x2[k],u[k]) + w1[k]
     # x2[k+1] = ssm2(x1[k],x2[k],u[k]) + w2[k]
-    z_sim[:,k+1] = ssm_euler(z_sim[:,k],u[:,k],A,B,1.0) + w_sim[:,k]
+    z_sim[:,k+1] = z_sim[:,k] + ssm_euler(z_sim[:,k],u[:,k],A,B,1.0) + w_sim[:,k]
 
 # simulate measurements
 v = np.zeros((Ny,T), dtype=float)
@@ -274,7 +274,7 @@ max_iter = 1000
 
 
 # define some state constraints, (these need to be tuples (so trailing comma))
-z_ub = jnp.array([[1.2],[100.]])
+z_ub = jnp.array([[1.0],[100.]])
 
 # an array of size [o,M,N+1], z_ub is size [2,1]
 state_constraints = (lambda z: jnp.expand_dims(z_ub,2) - z,)
