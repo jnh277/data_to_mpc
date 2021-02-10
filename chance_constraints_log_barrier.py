@@ -57,7 +57,7 @@ sqc_v = np.array([1.0,1.0],dtype=float)            # cost on state error
 sqc = np.diag(sqc_v)
 # src_v = np.array([1.0,1.0],dtype=float)
 # src = np.diag(src_v)            # cost on control action
-src = np.array([[1.0]])
+src = np.array([[0.01]])
 
 # simulation parameters
 T = 100             # number of time steps to simulate and record measurements for
@@ -227,11 +227,11 @@ ut = np.expand_dims(u[:,-1], axis=1)      # control action that was just applied
 def simulate(xt, u, w, theta):
     a = theta['a']
     b = theta['b']
-    [o, M, N] = w.shape
-    x = jnp.zeros((o, M, N+1))
+    [o, M, Np1] = w.shape
+    x = jnp.zeros((o, M, Np1+1))
     # x[:, 0] = xt
     x = index_update(x, index[:, :,0], xt)
-    for k in range(N):
+    for k in range(Np1):
         # x[:, k+1] = a * x[:, k] + b * u[k] + w[:, k]
         x = index_update(x, index[:, :, k+1], a * x[:, :, k] + b * u[:, k] + w[:, :, k])
     return x[:, :, 1:]
@@ -241,16 +241,22 @@ def msd_simulate(xt, u, w, theta):
     k = theta['k']
     b = theta['b']
     tau = theta['tau']
-    [Nx, Ns, Nh] = w.shape
-    x = jnp.zeros((Nx, Ns, Nh))
+    [Nx, Ns, Np1] = w.shape
+    x = jnp.zeros((Nx, Ns, Np1+1))
     # x[:, 0] = xt
     x = index_update(x, index[:, :, 0], xt)
-    for ii in range(Nh):
+    for ii in range(Np1):
         # x[:, k+1] = a * x[:, k] + b * u[k] + w[:, k]
-        x = index_update(x, index[0, :, ii+1], tau*x[1, :, ii])
-        x = index_update(x, index[1, :, ii+1], tau*(-k*(1/m)*x[0, :, ii] -b*(1/m)*x[1, :, ii] + (1/m)*u[:,ii]))
+        # xnext = jnp.vstack([tau*x[1, :, ii], x[1, : ii] + tau*(-k*(1/m)*x[0, :, ii] -b*(1/m)*x[1, :, ii] + (1/m)*u[:,ii])])
+        # print(xnext.shape)
+        # print(xnext)
+        # x = index_update(x, index[:, :, ii + 1], xnext)
+        x = index_update(x, index[0, :, ii+1], x[0,:,ii] + tau*x[1, :, ii])
+        x = index_update(x, index[1, :, ii+1], x[1,:,ii] + tau*(-k*(1/m)*x[0, :, ii] -b*(1/m)*x[1, :, ii] + (1/m)*u[:,ii]))
 
     return x[:, :, 1:]
+
+# x_{t+1},...,x_{t+N}, x_{t+N+1} that requires u to consist of u_t and uc [Nu,N]
 
 
 # compile cost and create gradient and hessian functions
@@ -268,8 +274,10 @@ max_iter = 1000
 
 
 # define some state constraints, (these need to be tuples (so trailing comma))
-z_ub = jnp.array([[1.2],[jnp.inf]])
-state_constraints = (lambda z: np.expand_dims(z_ub,2) - z,)
+z_ub = jnp.array([[1.2],[100.]])
+
+# an array of size [o,M,N+1], z_ub is size [2,1]
+state_constraints = (lambda z: jnp.expand_dims(z_ub,2) - z,)
 # state_constraints = ()
 input_constraints = (lambda u: 5.0 - u,)
 # input_constraints = ()
@@ -283,36 +291,36 @@ theta = {'m':m_mpc,
 
 # solve mpc optimisation problem
 result = solve_chance_logbarrier(np.zeros((1,Nh)), cost, gradient, hessian, ut, zt, theta, w_mpc, z_star, sqc, src,
-                            delta, msd_simulate, state_constraints, input_constraints)
+                            delta, msd_simulate, state_constraints, input_constraints, verbose=2)
 
 uc = result['uc']
 
-# if len(state_constraints) > 0:
-#     x_mpc = simulate(xt, np.hstack([ut, uc]), w, theta)
-#     hx = np.concatenate([state_constraint(x_mpc[:, :, 1:]) for state_constraint in state_constraints], axis=2)
-#     cx = np.mean(hx > 0, axis=1)
-#     print('State constraint satisfaction')
-#     print(cx)
-# if len(input_constraints) > 0:
-#     cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints],axis=1)
-#     print('Input constraint satisfaction')
-#     print(cu >= 0)
-# #
-# for i in range(6):
-#     plt.subplot(2,3,i+1)
-#     plt.hist(x_mpc[0,:, i*3], label='MC forward sim')
-#     if i==1:
-#         plt.title('MPC solution over horizon')
-#     plt.axvline(x_star, linestyle='--', color='g', linewidth=2, label='target')
-#     plt.axvline(x_ub, linestyle='--', color='r', linewidth=2, label='upper bound')
-#     plt.xlabel('t+'+str(i*3+1))
-# plt.tight_layout()
-# plt.legend()
-# plt.show()
+if len(state_constraints) > 0:
+    x_mpc = msd_simulate(zt, np.hstack([ut, uc]), w_mpc, theta)
+    hx = np.concatenate([state_constraint(x_mpc[:, :, 1:]) for state_constraint in state_constraints], axis=2)
+    cx = np.mean(hx > 0, axis=1)
+    print('State constraint satisfaction')
+    print(cx)
+if len(input_constraints) > 0:
+    cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints],axis=1)
+    print('Input constraint satisfaction')
+    print(cu >= 0)
+#
+for i in range(6):
+    plt.subplot(2,3,i+1)
+    plt.hist(x_mpc[0,:, i*3], label='MC forward sim')
+    if i==1:
+        plt.title('MPC solution over horizon')
+    # plt.axvline(x_star, linestyle='--', color='g', linewidth=2, label='target')
+    # plt.axvline(x_ub, linestyle='--', color='r', linewidth=2, label='upper bound')
+    plt.xlabel('t+'+str(i*3+1))
+plt.tight_layout()
+plt.legend()
+plt.show()
 
-# plt.plot(uc[0,:])
-# plt.title('MPC determined control action')
-# plt.show()
+plt.plot(uc[0,:])
+plt.title('MPC determined control action')
+plt.show()
 
 
 
