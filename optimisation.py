@@ -73,8 +73,8 @@ def log_barrier_cost(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, gamma, si
     o = w.shape[0]
     uc = jnp.reshape(z[:Nu*N], (Nu, N))              # control input variables  #,
     epsilon = z[Nu*N:N*Nu+ncx*N]                        # slack variables on state constraints
-
-    u = jnp.hstack([ut, uc]) # u_t was already performed, so uc is the next N control actions
+    utex = jnp.expand_dims(ut, axis=1) # expand if tuple
+    u = jnp.hstack([utex, uc]) # u_t was already performed, so uc is the next N control actions
     x = simulate(xt, u, w, theta)
     # state error and input penalty cost and cost that drives slack variables down
     # potentially np.reshape(x_star,(o,1,-1))??

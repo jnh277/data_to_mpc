@@ -211,7 +211,8 @@ zt = z_samps[:,ind,-1]  # inferred state for current time step
 w_mpc = np.zeros((Nx,Ns,Nh+1),dtype=float)
 w_mpc[0,:,:] = np.expand_dims(col_vec(q_mpc[0,:]) * np.random.randn(Ns, Nh+1), 0)  # uses the sampled stds, need to sample for x_t to x_{t+N+1}
 w_mpc[1,:,:] = np.expand_dims(col_vec(q_mpc[1,:]) * np.random.randn(Ns, Nh+1), 0)
-ut = np.expand_dims(u[:,-1], axis=1)      # control action that was just applied
+ut = u[:,-1]
+# ut = np.expand_dims(u[:,-1], axis=1)      # control action that was just applied
 
 # At this point I have:
 # zt which is the current inferred state, and is [Nx,Ns]: Ns samples of Nx column vector
@@ -245,8 +246,8 @@ def msd_simulate(xt, u, w, theta):
     x = index_update(x, index[:, :, 0], xt)
     for ii in range(Nh):
         # x[:, k+1] = a * x[:, k] + b * u[k] + w[:, k]
-        x = index_update(x, index[0, :, k+1], tau*x[1, :, k])
-        x = index_update(x, index[1, :, k+1], tau*(-k*(1/m)*x[0, :, k] -b*(1/m)*x[1, :, k] + (1/m)*u[:,k]))
+        x = index_update(x, index[0, :, ii+1], tau*x[1, :, ii])
+        x = index_update(x, index[1, :, ii+1], tau*(-k*(1/m)*x[0, :, ii] -b*(1/m)*x[1, :, ii] + (1/m)*u[:,ii]))
 
     return x[:, :, 1:]
 
@@ -266,22 +267,22 @@ max_iter = 1000
 
 
 # define some state constraints, (these need to be tuples (so trailing comma))
-z_ub = jnp.array([[1.2],[jnp.Inf]])
-state_constraints = (lambda x: z_ub - z,)
+z_ub = jnp.array([[1.2],[jnp.inf]])
+state_constraints = (lambda z: z_ub - z,)
 # state_constraints = ()
 input_constraints = (lambda u: 5.0 - u,)
 # input_constraints = ()
 
-theta = {'m':m_samps,
-         'k':k_samps,
-         'b':b_samps,
+theta = {'m':m_mpc,
+         'k':k_mpc,
+         'b':b_mpc,
          'tau': 1.0
          }
 
 
 # solve mpc optimisation problem
-result = solve_chance_logbarrier(np.zeros((1,N)), cost, gradient, hessian, ut, zt, theta, w_mpc, z_star, sqc, src,
-                            delta, simulate, state_constraints, input_constraints)
+result = solve_chance_logbarrier(np.zeros((1,Nh)), cost, gradient, hessian, ut, zt, theta, w_mpc, z_star, sqc, src,
+                            delta, msd_simulate, state_constraints, input_constraints)
 
 uc = result['uc']
 
