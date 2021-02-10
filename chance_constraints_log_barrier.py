@@ -195,7 +195,7 @@ theta = {'a':a,
 
 # solve mpc optimisation problem
 result = solve_chance_logbarrier(np.zeros((1,N)), cost, gradient, hessian, ut, xt, theta, w, x_star, sqc, src,
-                            delta, simulate, state_constraints, input_constraints)
+                            delta, simulate, state_constraints, input_constraints, verbose=2)
 
 uc = result['uc']
 
