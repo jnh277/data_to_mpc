@@ -25,9 +25,10 @@ Uses JAX to compile and run code on GPU/CPU and provide gradients and hessians
 import pystan
 import numpy as np
 import matplotlib.pyplot as plt
-from helpers import plot_trace, col_vec, row_vec
+from helpers import plot_trace, col_vec, row_vec, suppress_stdout_stderr
 from pathlib import Path
 import pickle
+from tqdm import tqdm
 
 # jax related imports
 import jax.numpy as jnp
@@ -46,17 +47,19 @@ x_star = np.array([1.0])        # desired set point
 M = 200                             # number of samples we will use for MC MPC
 N = 10                              # horizonline of MPC algorithm
 sqc = np.array([[1.0]])             # square root cost on state error
-src = np.array([[0.1]])             # square root cost on control action
+src = np.array([[0.01]])             # square root cost on control action
 delta = 0.05                        # desired maximum probability of not satisfying the constraint
-x_ub = 1.2
-u_ub = 3.0
+# x_ub = 1.2
+x_ub = 1.
+u_ub = 1.5
 state_constraints = (lambda x: x_ub - x,)
 input_constraints = (lambda u: u_ub - u,)
 
 
 # simulation parameters
 T = 30              # number of time steps to simulate and record measurements for
-x0 = 0.5            # initial time step
+# x0 = 0.5            # initial time step
+x0 = -1.
 r_true = 0.01       # measurement noise standard deviation
 q_true = 0.05       # process noise standard deviation
 
@@ -110,7 +113,7 @@ b_est_save = np.zeros((M,T))
 q_est_save = np.zeros((M,T))
 r_est_save = np.zeros((M,T))
 ### SIMULATE SYSTEM AND PERFORM MPC CONTROL
-for t in range(T):
+for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control'):
     # simulate system
     # apply u_t
     # this takes x_t to x_{t+1}
@@ -123,13 +126,15 @@ for t in range(T):
         'N': t+1,
         'y': y[:t+1],
         'u': u[:t+1],
-        'prior_mu': np.array([0.8, 0.05, 0.1, 0.1]),
-        'prior_std': np.array([0.2, 0.2, 0.2, 0.2]),
+        # 'prior_mu': np.array([0.8, 0.05, 0.1, 0.1]),
+        # 'prior_std': np.array([0.2, 0.2, 0.2, 0.2]),
+        'prior_mu': np.array([-0.5, 0.05, 0.1, 0.1]),
+        'prior_std': np.array([1.0, 0.2, 0.2, 0.2]),
         'prior_state_mu': 0.3,
         'prior_state_std': 0.2,
     }
-
-    fit = model.sampling(data=stan_data, warmup=warmup, iter=iter, chains=chains)
+    with suppress_stdout_stderr():
+        fit = model.sampling(data=stan_data, warmup=warmup, iter=iter, chains=chains)
     traces = fit.extract()
 
     # state samples
@@ -158,7 +163,7 @@ for t in range(T):
 
     # calculate next control action
     result = solve_chance_logbarrier(np.zeros((1, N)), cost, gradient, hessian, ut, xt, theta, w, x_star, sqc, src,
-                                     delta, simulate, state_constraints, input_constraints, verbose=True)
+                                     delta, simulate, state_constraints, input_constraints, verbose=False)
 
     uc = result['uc']
     u[t+1] = uc[0,0]
