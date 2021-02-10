@@ -211,8 +211,8 @@ zt = z_samps[:,ind,-1]  # inferred state for current time step
 w_mpc = np.zeros((Nx,Ns,Nh+1),dtype=float)
 w_mpc[0,:,:] = np.expand_dims(col_vec(q_mpc[0,:]) * np.random.randn(Ns, Nh+1), 0)  # uses the sampled stds, need to sample for x_t to x_{t+N+1}
 w_mpc[1,:,:] = np.expand_dims(col_vec(q_mpc[1,:]) * np.random.randn(Ns, Nh+1), 0)
-ut = u[:,-1]
-# ut = np.expand_dims(u[:,-1], axis=1)      # control action that was just applied
+# ut = u[:,-1] 
+ut = np.expand_dims(u[:,-1], axis=1)      # control action that was just applied
 
 # At this point I have:
 # zt which is the current inferred state, and is [Nx,Ns]: Ns samples of Nx column vector
