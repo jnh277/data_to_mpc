@@ -238,25 +238,16 @@ def msd_simulate(xt, u, w, theta):
     m = theta['m']
     k = theta['k']
     b = theta['b']
+    tau = theta['tau']
     [Nx, Ns, Nh] = w.shape
-    Nu = u.shape[0]
-    A = jnp.zeros((Nx,Nx))
-    B = jnp.zeros((Nx,Nu))
-    # A[0,1] = 1.0;
-    A = index_update(A, index[0, 1,:], 1.0)
-    # A[1,0] = -k_true/m_true
-    A = index_update(A, index[1, 0,:], -k*(1.0/m))
-    # A[1,1] = -b_true/m_true
-    A = index_update(A, index[1, 1,:], -b*(1.0/m))
-    # B[1,0] = 1/m_true;
-    B = index_update(B, index[1, 0,:], 1.0/m)
-
     x = jnp.zeros((Nx, Ns, Nh))
     # x[:, 0] = xt
     x = index_update(x, index[:, :, 0], xt)
     for ii in range(Nh):
         # x[:, k+1] = a * x[:, k] + b * u[k] + w[:, k]
-        x = index_update(x, index[:, :, k+1], jnp.matmul(A[:,:,k],x[:, :, k]) + jnp.matmul(B[:,:,k] * u[:, k] + w[:, :, k])
+        x = index_update(x, index[0, :, k+1], tau*x[1, :, k])
+        x = index_update(x, index[1, :, k+1], tau*(-k*(1/m)*x[0, :, k] -b*(1/m)*x[1, :, k] + (1/m)*u[:,k]))
+
     return x[:, :, 1:]
 
 
@@ -275,18 +266,21 @@ max_iter = 1000
 
 
 # define some state constraints, (these need to be tuples (so trailing comma))
-x_ub = 1.2
-state_constraints = (lambda x: x_ub - x,)
+z_ub = jnp.array([[1.2],[jnp.Inf]])
+state_constraints = (lambda x: z_ub - z,)
 # state_constraints = ()
 input_constraints = (lambda u: 5.0 - u,)
 # input_constraints = ()
 
-theta = {'a':a,
-         'b':b,}
+theta = {'m':m_samps,
+         'k':k_samps,
+         'b':b_samps,
+         'tau': 1.0
+         }
 
 
 # solve mpc optimisation problem
-result = solve_chance_logbarrier(np.zeros((1,N)), cost, gradient, hessian, ut, xt, theta, w, x_star, sqc, src,
+result = solve_chance_logbarrier(np.zeros((1,N)), cost, gradient, hessian, ut, zt, theta, w_mpc, z_star, sqc, src,
                             delta, simulate, state_constraints, input_constraints)
 
 uc = result['uc']
