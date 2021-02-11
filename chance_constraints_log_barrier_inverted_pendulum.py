@@ -97,10 +97,7 @@ Nu = 1;
 #     dz[3,:] = (m22 * d1 - m12 .* d2) ./ sc;
 #     dz[4,:] = (m11 .* d2 - m12 .* d1) ./ sc;
 
-def ssm_euler(x,u,A,B,T):
-    return (np.matmul(A,x) + np.matmul(B,u)) * T;
-
-def qube_gradient(xt,u,t):
+def gradient(xt,u,t): # t is theta, this is for QUBE
     cos_xt1 = jnp.cos(xt[1,:]) # there are 5 of these
     sin_xt1 = jnp.sin(xt[1,:]) # there are 4 of these
     m11 = t["Jr + Mp * Lr * Lr"] + t["0.25 * Mp * Lp * Lp"] - t["0.25 * Mp * Lp * Lp"] * cos_xt1 * cos_xt1
@@ -116,6 +113,29 @@ def qube_gradient(xt,u,t):
     dx = index_update(dx, index[2, :], (m22 * d1 - m12 * d2)/sc)
     dx = index_update(dx, index[3, :], (m11 * d2 - m12 * d1)/sc)
     return dx
+    
+def rk4(xt,ut,theta):
+    h = theta['h']
+    k1 = gradient(xt,ut,theta)
+    k2 = gradient(xt + k1*h/2,ut,theta)
+    k3 = gradient(xt + k2*h/2,ut,theta)
+    k4 = gradient(xt + k3*h,ut,theta)
+    return xt + (k1/6 + k2/3 + k3/3 + k4/6)*h
+
+def process(xt,u,w,theta):
+    [Nx, Ns, Np1] = w.shape
+    x = jnp.zeros((Nx, Ns, Np1+1))
+    x = index_update(x, index[:, :, 0], rk4(xt,ut,theta))
+    for ii in range(Np1):
+        x = index_update(x, index[0, :, ii+1], rk4(x[:,:,ii],u[:,ii],theta) + w[:, :, ii])
+    return x[:, :, 1:]  
+
+# THETA WILL HAVE TO CONTAIN SOME REALLY WEIRD SHIT!
+
+def ssm_euler(x,u,A,B,T):
+    return (np.matmul(A,x) + np.matmul(B,u)) * T;
+
+
 
 
 # SSM equations
@@ -285,8 +305,8 @@ def msd_simulate(xt, u, w, theta):
         # print(xnext.shape)
         # print(xnext)
         # x = index_update(x, index[:, :, ii + 1], xnext)
-        x = index_update(x, index[0, :, ii+1], x[0,:,ii] + tau*x[1, :, ii])
-        x = index_update(x, index[1, :, ii+1], x[1,:,ii] + tau*(-k*(1/m)*x[0, :, ii] -b*(1/m)*x[1, :, ii] + (1/m)*u[:,ii]))
+        x = index_update(x, index[0, :, ii+1], x[0,:,ii] + tau*x[1, :, ii] + w[0,:,ii])
+        x = index_update(x, index[1, :, ii+1], x[1,:,ii] + tau*(-k*(1/m)*x[0, :, ii] -b*(1/m)*x[1, :, ii] + (1/m)*u[:,ii]) + w[1,:,ii])
 
     return x[:, :, 1:]
 
