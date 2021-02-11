@@ -114,9 +114,8 @@ def qube_gradient(xt,u,t): # t is theta
     dx = index_update(dx, index[3, :], (m11 * d2 - m12 * d1)/sc)
     return dx
     
-def rk4(xt,ut,theta):
+def rk4(xt,ut,theta,gradient):
     h = theta['h']
-    gradient = qube_gradient
     k1 = gradient(xt,ut,theta)
     k2 = gradient(xt + k1*h/2,ut,theta)
     k3 = gradient(xt + k2*h/2,ut,theta)
@@ -124,11 +123,12 @@ def rk4(xt,ut,theta):
     return xt + (k1/6 + k2/3 + k3/3 + k4/6)*h
 
 def qube_process(xt,u,w,theta):
+    gradient = qube_gradient
     [Nx, Ns, Np1] = w.shape
     x = jnp.zeros((Nx, Ns, Np1+1))
-    x = index_update(x, index[:, :, 0], rk4(xt,ut,theta))
+    x = index_update(x, index[:, :, 0], rk4(xt,ut,theta,gradient))
     for ii in range(Np1):
-        x = index_update(x, index[0, :, ii+1], rk4(x[:,:,ii],u[:,ii],theta))
+        x = index_update(x, index[0, :, ii+1], rk4(x[:,:,ii],u[:,ii],theta,gradient))
     return x[:, :, 1:]  
 
 
