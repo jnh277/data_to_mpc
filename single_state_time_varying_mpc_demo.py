@@ -60,13 +60,13 @@ input_constraints = (lambda u: u_ub - u,)
 
 
 # simulation parameters
-T = 100              # number of time steps to simulate and record measurements for
+T = 150              # number of time steps to simulate and record measurements for
 x0 = 0.5            # initial time step
 # x0 = -1.
 r_true = 0.01       # measurement noise standard deviation
 q_true = 0.05       # process noise standard deviation
 a_true = 0.9 * np.ones((T))
-a_true[int(T/2):] = 0.7
+a_true[50:] = 0.7
 
 
 
