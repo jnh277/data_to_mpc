@@ -110,9 +110,8 @@ transformed parameters {
 
 }
 model {
-    Lcorr ~ lkj_corr_cholesky(2);
-
     // parameter priors
+    // TODO: update all these priors
     theta_hyper ~ cauchy(0.0, 1.0);
     shrinkage_param ~ cauchy(0.0, 1.0);
     theta ~ normal(0.0, theta_hyper * shrinkage_param);
