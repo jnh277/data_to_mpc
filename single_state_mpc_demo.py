@@ -49,9 +49,9 @@ N = 10                              # horizonline of MPC algorithm
 sqc = np.array([[1.0]])             # square root cost on state error
 src = np.array([[0.01]])             # square root cost on control action
 delta = 0.05                        # desired maximum probability of not satisfying the constraint
+
 x_ub = 1.2
-# x_ub = 1.
-u_ub = 1.5
+u_ub = 3.
 state_constraints = (lambda x: x_ub - x,)
 input_constraints = (lambda u: u_ub - u,)
 
@@ -59,7 +59,6 @@ input_constraints = (lambda u: u_ub - u,)
 # simulation parameters
 T = 30              # number of time steps to simulate and record measurements for
 x0 = 0.5            # initial time step
-# x0 = -1.
 r_true = 0.01       # measurement noise standard deviation
 q_true = 0.05       # process noise standard deviation
 
@@ -128,8 +127,6 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
         'u': u[:t+1],
         'prior_mu': np.array([0.8, 0.05, 0.1, 0.1]),
         'prior_std': np.array([0.2, 0.2, 0.2, 0.2]),
-        # 'prior_mu': np.array([-0.5, 0.05, 0.1, 0.1]),
-        # 'prior_std': np.array([1.0, 0.2, 0.2, 0.2]),
         'prior_state_mu': 0.3,
         'prior_state_std': 0.2,
     }
