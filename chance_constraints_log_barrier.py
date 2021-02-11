@@ -311,8 +311,8 @@ for i in range(6):
     plt.hist(x_mpc[0,:, i*3], label='MC forward sim')
     if i==1:
         plt.title('MPC solution over horizon')
-    # plt.axvline(x_star, linestyle='--', color='g', linewidth=2, label='target')
-    # plt.axvline(x_ub, linestyle='--', color='r', linewidth=2, label='upper bound')
+    plt.axvline(z_star[0,:], linestyle='--', color='g', linewidth=2, label='target')
+    plt.axvline(z_ub[0,:], linestyle='--', color='r', linewidth=2, label='upper bound')
     plt.xlabel('t+'+str(i*3+1))
 plt.tight_layout()
 plt.legend()
