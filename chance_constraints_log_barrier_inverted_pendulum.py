@@ -81,8 +81,42 @@ Nu = 1;
 #     return (a11*x1 + a12*x2 + b1*u)*T
 # def ssm2(x1, x2, u, T, a21=0.5, a22=-0.5, b2=0.3):
 #     return a21*x1 + a22*x2 + b2*u
+
+#   row_vector[pdims[2]] m11 = Jr + Mp * Lr^2 + 0.25 * Mp * Lp^2 - 0.25 * Mp * Lp^2 * (cos(z[2,:]) .* cos(z[2,:]));
+#     row_vector[pdims[2]] m12 = 0.5 * Mp * Lp * Lr * cos(z[2,:]);
+#     real m22 = (Jp + 0.25 * Mp * Lp^2);
+#     row_vector[pdims[2]] sc = m11 * m22 - m12 .* m12;      // denominator of 2x2 inverse of mass matrix
+
+#     row_vector[pdims[2]] tau = (Km * (u - Km * z[3,:])) / Rm;
+
+#     row_vector[pdims[2]] d1 = tau - Dr * z[3,:] - 0.5 * Mp * Lp^2 * (sin(z[2,:]) .* cos(z[2,:]) .*z[3,:].* z[4,:]) + 0.5 * Mp * Lp * Lr * (sin(z[2,:]) .* z[4,:] .* z[4,:]);
+#     row_vector[pdims[2]] d2 = - Dp * z[4,:] + 0.25 *Mp * Lp^2 * (cos(z[2,:]) .* sin(z[2,:]) .* z[3,:].*z[3,:]) - 0.5 * Mp * Lp * g * sin(z[2,:]);
+
+#     dz[1,:] = z[3,:];
+#     dz[2,:] = z[4,:];
+#     dz[3,:] = (m22 * d1 - m12 .* d2) ./ sc;
+#     dz[4,:] = (m11 .* d2 - m12 .* d1) ./ sc;
+
 def ssm_euler(x,u,A,B,T):
     return (np.matmul(A,x) + np.matmul(B,u)) * T;
+
+def qube_gradient(xt,u,t):
+    cos_xt1 = jnp.cos(xt[1,:]) # there are 5 of these
+    sin_xt1 = jnp.sin(xt[1,:]) # there are 4 of these
+    m11 = t["Jr + Mp * Lr * Lr"] + t["0.25 * Mp * Lp * Lp"] - t["0.25 * Mp * Lp * Lp"] * cos_xt1 * cos_xt1
+    m12 = t["0.5 * Mp * Lp * Lr"] * cos_xt1
+    m22 = t["m22"] # this should be a scalar anyway - can be vector
+    sc = m11 * m22 - m12 * m12
+    tau = (t['Km'] * (u[0,:] - t['Km'] * xt[2,:])) / t['Rm'] # u is a scalr
+    d1 = tau - t['Dr'] * xt[2,:] - 2 * t["0.25 * Mp * Lp * Lp"] * sin_xt1 * cos_xt1 * xt[2,:] * xt[3,:] + t["0.5 * Mp * Lp * Lr"] * sin_xt1 * xt[3,:] * xt[3,:]
+    d2 = -t['Dp'] * xt[3,:] + t["0.25 * Mp * Lp * Lp"] * cos_xt1 * sin_xt1 * xt[2,:] * xt[2,:] - t["0.5 * Mp * Lp * g"] * sin_xt1
+    dx = jnp.zeros_like(xt)
+    dx = index_update(dx, index[0, :], xt[2,:])
+    dx = index_update(dx, index[1, :], xt[3,:])
+    dx = index_update(dx, index[2, :], (m22 * d1 - m12 * d2)/sc)
+    dx = index_update(dx, index[3, :], (m11 * d2 - m12 * d1)/sc)
+    return dx
+
 
 # SSM equations
 A = np.zeros((Nx,Nx), dtype=float)
