@@ -251,8 +251,8 @@ def msd_simulate(xt, u, w, theta):
         # print(xnext.shape)
         # print(xnext)
         # x = index_update(x, index[:, :, ii + 1], xnext)
-        x = index_update(x, index[0, :, ii+1], x[0,:,ii] + tau*x[1, :, ii])
-        x = index_update(x, index[1, :, ii+1], x[1,:,ii] + tau*(-k*(1/m)*x[0, :, ii] -b*(1/m)*x[1, :, ii] + (1/m)*u[:,ii]))
+        x = index_update(x, index[0, :, ii+1], x[0,:,ii] + tau*x[1, :, ii] + w[0,:,ii])
+        x = index_update(x, index[1, :, ii+1], x[1,:,ii] + tau*(-k*(1/m)*x[0, :, ii] -b*(1/m)*x[1, :, ii] + (1/m)*u[:,ii]) + w[1,:,ii])
 
     return x[:, :, 1:]
 
