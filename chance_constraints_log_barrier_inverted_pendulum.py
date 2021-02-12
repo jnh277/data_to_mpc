@@ -45,15 +45,15 @@ from optimisation import log_barrier_cost, solve_chance_logbarrier
 
 config.update("jax_enable_x64", True)           # run jax in 64 bit mode for accuracy
 
-second_order = True
+
 
 #----------------- Parameters ---------------------------------------------------#
 
 # Control parameters
-z_star = np.array([[1.0],[0.0]],dtype=float)        # desired set point in z1
+z_star = np.array([[3.141592654],[0.0],[0.0],[0.0]],dtype=float)        # desired set point in z1
 Ns = 200             # number of samples we will use for MC MPC
 Nh = 20              # horizonline of MPC algorithm
-sqc_v = np.array([1.0,1.0],dtype=float)            # cost on state error
+sqc_v = np.array([1.0,1.0,1.0,1.0],dtype=float)            # cost on state error
 sqc = np.diag(sqc_v)
 # src_v = np.array([1.0,1.0],dtype=float)
 # src = np.diag(src_v)            # cost on control action
@@ -61,52 +61,73 @@ src = np.array([[0.01]])
 
 # simulation parameters
 T = 100             # number of time steps to simulate and record measurements for
-z1_0 = 3.0            # initial x
+z1_0 = 0.0            # initial x
 z2_0 = 0.0
-r1_true = 0.1        # measurement noise standard deviation
+z3_0 = 0.0
+z4_0 = 0.0
+
+r1_true = 0.01        # measurement noise standard deviation
 r2_true = 0.01
 q1_true = 0.05       # process noise standard deviation
-q2_true = 0.005      # process noise standard deviation
-m_true = 1;
-b_true = 0.7
-k_true = 0.25
+q2_true = 0.05      # process noise standard deviation
+q3_true = 0.005       # process noise standard deviation
+q4_true = 0.005      # process noise standard deviation
 
-Nx = 2;
-Ny = 2;
+mr_true = 0.095 # kg
+mp_true = 0.024 # kg
+Lp_true = 0.129 # m
+Lr_true = 0.085 # m
+Jr_true = mr_true * Lr_true * Lr_true / 3 # kgm^2
+Jp_true = mp_true * Lp_true * Lp_true / 3 # kgm^2
+Km_true = 0.042 # Vs/rad / Nm/A
+Rm_true = 8.4 # ohms
+Dp_true = 5e-5 # Nms/rad
+Dr_true = 1e-3 # Nms/rad
+
+theta_true = {
+        'Mp': mp_true,
+        'Lp': Lp_true,
+        'Lr': Lr_true,
+        'Jr': Jr_true,
+        'Jp': Jp_true,
+        'Km': Km_true,
+        'Rm': Rm_true,
+        'Dp': Dp_true,
+        'Dr': Dr_true,
+        'g': 9.81,
+        'h': 0.001
+    }
+Nx = 4;
+Ny = 3;
 Nu = 1;
 
 #----------------- Simulate the system-------------------------------------------#
 
-# def ssm1(x1, x2, u, T, a11=0.0, a12=1.0, b1=0.0):
-#     return (a11*x1 + a12*x2 + b1*u)*T
-# def ssm2(x1, x2, u, T, a21=0.5, a22=-0.5, b2=0.3):
-#     return a21*x1 + a22*x2 + b2*u
+def fill_theta(t):
+    Jr = t['Jr']
+    Jp = t['Jp']
+    Mp = t['Mp']
+    Lr = t['Lr']
+    Lp = t['Lp']
+    g = t['g']
 
-#   row_vector[pdims[2]] m11 = Jr + Mp * Lr^2 + 0.25 * Mp * Lp^2 - 0.25 * Mp * Lp^2 * (cos(z[2,:]) .* cos(z[2,:]));
-#     row_vector[pdims[2]] m12 = 0.5 * Mp * Lp * Lr * cos(z[2,:]);
-#     real m22 = (Jp + 0.25 * Mp * Lp^2);
-#     row_vector[pdims[2]] sc = m11 * m22 - m12 .* m12;      // denominator of 2x2 inverse of mass matrix
-
-#     row_vector[pdims[2]] tau = (Km * (u - Km * z[3,:])) / Rm;
-
-#     row_vector[pdims[2]] d1 = tau - Dr * z[3,:] - 0.5 * Mp * Lp^2 * (sin(z[2,:]) .* cos(z[2,:]) .*z[3,:].* z[4,:]) + 0.5 * Mp * Lp * Lr * (sin(z[2,:]) .* z[4,:] .* z[4,:]);
-#     row_vector[pdims[2]] d2 = - Dp * z[4,:] + 0.25 *Mp * Lp^2 * (cos(z[2,:]) .* sin(z[2,:]) .* z[3,:].*z[3,:]) - 0.5 * Mp * Lp * g * sin(z[2,:]);
-
-#     dz[1,:] = z[3,:];
-#     dz[2,:] = z[4,:];
-#     dz[3,:] = (m22 * d1 - m12 .* d2) ./ sc;
-#     dz[4,:] = (m11 .* d2 - m12 .* d1) ./ sc;
+    t['Jr + Mp * Lr * Lr'] = Jr + Mp * Lr * Lr
+    t['0.25 * Mp * Lp * Lp'] = 0.25 * Mp * Lp * Lp
+    t['0.5 * Mp * Lp * Lr'] = 0.5 * Mp * Lp * Lr
+    t['m22'] = Jp + 0.25 * Mp * Lp * Lp
+    t['0.5 * Mp * Lp * g'] = 0.5 * Mp * Lp * g
+    return t
 
 def gradient(xt,u,t): # t is theta, this is for QUBE
     cos_xt1 = jnp.cos(xt[1,:]) # there are 5 of these
     sin_xt1 = jnp.sin(xt[1,:]) # there are 4 of these
-    m11 = t["Jr + Mp * Lr * Lr"] + t["0.25 * Mp * Lp * Lp"] - t["0.25 * Mp * Lp * Lp"] * cos_xt1 * cos_xt1
-    m12 = t["0.5 * Mp * Lp * Lr"] * cos_xt1
-    m22 = t["m22"] # this should be a scalar anyway - can be vector
+    m11 = t['Jr + Mp * Lr * Lr'] + t['0.25 * Mp * Lp * Lp'] - t['0.25 * Mp * Lp * Lp'] * cos_xt1 * cos_xt1
+    m12 = t['0.5 * Mp * Lp * Lr'] * cos_xt1
+    m22 = t['m22'] # this should be a scalar anyway - can be vector
     sc = m11 * m22 - m12 * m12
-    tau = (t['Km'] * (u[0,:] - t['Km'] * xt[2,:])) / t['Rm'] # u is a scalr
-    d1 = tau - t['Dr'] * xt[2,:] - 2 * t["0.25 * Mp * Lp * Lp"] * sin_xt1 * cos_xt1 * xt[2,:] * xt[3,:] + t["0.5 * Mp * Lp * Lr"] * sin_xt1 * xt[3,:] * xt[3,:]
-    d2 = -t['Dp'] * xt[3,:] + t["0.25 * Mp * Lp * Lp"] * cos_xt1 * sin_xt1 * xt[2,:] * xt[2,:] - t["0.5 * Mp * Lp * g"] * sin_xt1
+    tau = (t['Km'] * (u[0] - t['Km'] * xt[2,:])) / t['Rm'] # u is a scalr
+    d1 = tau - t['Dr'] * xt[2,:] - 2 * t['0.25 * Mp * Lp * Lp'] * sin_xt1 * cos_xt1 * xt[2,:] * xt[3,:] + t['0.5 * Mp * Lp * Lr'] * sin_xt1 * xt[3,:] * xt[3,:]
+    d2 = -t['Dp'] * xt[3,:] + t['0.25 * Mp * Lp * Lp'] * cos_xt1 * sin_xt1 * xt[2,:] * xt[2,:] - t['0.5 * Mp * Lp * g'] * sin_xt1
     dx = jnp.zeros_like(xt)
     dx = index_update(dx, index[0, :], xt[2,:])
     dx = index_update(dx, index[1, :], xt[3,:])
@@ -122,42 +143,36 @@ def rk4(xt,ut,theta):
     k4 = gradient(xt + k3*h,ut,theta)
     return xt + (k1/6 + k2/3 + k3/3 + k4/6)*h
 
-def process(xt,u,w,theta):
-    [Nx, Ns, Np1] = w.shape
+def pend_simulate(xt,u,w,theta):
+    [Nx,Ns,Np1] = w.shape
     x = jnp.zeros((Nx, Ns, Np1+1))
-    x = index_update(x, index[:, :, 0], rk4(xt,ut,theta))
+    x = index_update(x, index[:, :, 0], xt[:,:,0])
     for ii in range(Np1):
-        x = index_update(x, index[0, :, ii+1], rk4(x[:,:,ii],u[:,ii],theta) + w[:, :, ii])
+        x = index_update(x, index[:, :, ii+1], rk4(x[:,:,ii],u[:,ii],theta) + w[:, :, ii])
     return x[:, :, 1:]  
 
+# compile cost and create gradient and hessian functions
+sim = jit(pend_simulate)  # static argnums means it will recompile if N changes
+
 # THETA WILL HAVE TO CONTAIN SOME REALLY WEIRD SHIT!
+theta_true = fill_theta(theta_true)
 
-def ssm_euler(x,u,A,B,T):
-    return (np.matmul(A,x) + np.matmul(B,u)) * T;
-
-
-
-
-# SSM equations
-A = np.zeros((Nx,Nx), dtype=float)
-B = np.zeros((Nx,Nu), dtype=float)
-
-A[0,1] = 1.0;
-A[1,0] = -k_true/m_true
-A[1,1] = -b_true/m_true
-B[1,0] = 1/m_true;
-
-
-z_sim = np.zeros((Nx,T+1), dtype=float) # state history
+z_sim = np.zeros((Nx,1,T+1), dtype=float) # state history
 
 # initial state
-z_sim[0,0] = z1_0 
-z_sim[1,0] = z2_0 
+z_sim[0,:,0] = z1_0 
+z_sim[1,:,0] = z2_0 
+z_sim[2,:,0] = z3_0
+z_sim[3,:,0] = z4_0 
 
 # noise predrawn and independant
-w_sim = np.zeros((Nx,T),dtype=float)
+w_sim = np.zeros((Nx,1,T),dtype=float)
 w_sim[0,:] = np.random.normal(0.0, q1_true, T)
 w_sim[1,:] = np.random.normal(0.0, q2_true, T)
+w_sim[2,:] = np.random.normal(0.0, q3_true, T)
+w_sim[3,:] = np.random.normal(0.0, q4_true, T)
+# w_sim = np.expand_dims(w_sim,axis=2)
+
 
 # create some inputs that are random but held for 10 time steps
 u = np.random.uniform(-0.5,0.5, T*Nu)
@@ -167,23 +182,23 @@ u = np.reshape(u, (Nu,T))
 for k in range(T):
     # x1[k+1] = ssm1(x1[k],x2[k],u[k]) + w1[k]
     # x2[k+1] = ssm2(x1[k],x2[k],u[k]) + w2[k]
-    z_sim[:,k+1] = z_sim[:,k] + ssm_euler(z_sim[:,k],u[:,k],A,B,1.0) + w_sim[:,k]
+    z_sim[:,:,[k+1]] = sim(z_sim[:,:,[k]],u[:,[k]],w_sim[:,:,[k]],theta_true)
 
 # simulate measurements
-v = np.zeros((Ny,T), dtype=float)
+v = np.zeros((1,T), dtype=float)
 v[0,:] = np.random.normal(0.0, r1_true, T)
-v[1,:] = np.random.normal(0.0, r2_true, T)
-y = np.zeros((Ny,T), dtype=float)
-y[0,:] = z_sim[0,:-1]
-y[1,:] = (-k_true*z_sim[0,:-1] -b_true*z_sim[1,:-1] + u[0,:])/m_true
+# v[1,:] = np.random.normal(0.0, r2_true, T)
+y = np.zeros((1,T), dtype=float)
+y[0,:] = z_sim[0,:,:-1]
+# y[1,:] = (-k_true*z_sim[0,:-1] -b_true*z_sim[1,:-1] + u[0,:])/m_true
 y = y + v; # add noise
 
 plt.subplot(2,1,1)
 plt.plot(u[0,:])
-plt.plot(y[1,:],linestyle='None',color='r',marker='*')
+# plt.plot(y[1,:],linestyle='None',color='r',marker='*')
 plt.title('Simulated inputs and measurement used for inference')
 plt.subplot(2, 1, 2)
-plt.plot(z_sim[0,:])
+plt.plot(z_sim[0,0,:])
 plt.plot(y[0,:],linestyle='None',color='r',marker='*')
 plt.title('Simulated state 1 and measurements used for inferences')
 plt.tight_layout()
