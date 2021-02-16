@@ -141,15 +141,19 @@ def rk4(xt,ut,theta):
     k2 = gradient(xt + k1*h/2,ut,theta)
     k3 = gradient(xt + k2*h/2,ut,theta)
     k4 = gradient(xt + k3*h,ut,theta)
-    return xt + (k1/6 + k2/3 + k3/3 + k4/6)*h
+    return xt + (k1/6 + k2/3 + k3/3 + k4/6)*h # should handle a 2D x just fine
 
-def pend_simulate(xt,u,w,theta):
+def pend_simulate(xt,u,w,theta):# w is expected to be 3D. xt is expected to be 2D. ut is expected to be 2d but also, should handle being a vector (3d)
     [Nx,Ns,Np1] = w.shape
+    if u.ndim == 2:
+        Nu = u.shape[1]
+        if Nu != Np1:
+            print('wyd??')
     x = jnp.zeros((Nx, Ns, Np1+1))
-    x = index_update(x, index[:, :, 0], xt[:,:,0])
+    x = index_update(x, index[:, :, 0], xt)
     for ii in range(Np1):
-        x = index_update(x, index[:, :, ii+1], rk4(x[:,:,ii],u[:,ii],theta) + w[:, :, ii])
-    return x[:, :, 1:]  
+        x = index_update(x, index[:, :, ii+1], rk4(x[:,:,ii],u[:,ii],theta) + w[:, :, ii]) # slicing creates 2d x into 3d x. Also, Np1 loop will consume all of w
+    return x[:, :, 1:]  # return everything except xt 
 
 # compile cost and create gradient and hessian functions
 sim = jit(pend_simulate)  # static argnums means it will recompile if N changes
@@ -182,7 +186,7 @@ u = np.reshape(u, (Nu,T))
 for k in range(T):
     # x1[k+1] = ssm1(x1[k],x2[k],u[k]) + w1[k]
     # x2[k+1] = ssm2(x1[k],x2[k],u[k]) + w2[k]
-    z_sim[:,:,[k+1]] = sim(z_sim[:,:,[k]],u[:,[k]],w_sim[:,:,[k]],theta_true)
+    z_sim[:,:,k+1] = sim(z_sim[:,:,k],u[:,[k]],w_sim[:,:,[k]],theta_true)
 
 # simulate measurements
 v = np.zeros((1,T), dtype=float)
