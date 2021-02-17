@@ -68,6 +68,7 @@ z4_0 = 0.0
 
 r1_true = 0.01        # measurement noise standard deviation
 r2_true = 0.01
+r3_true = 0.01
 q1_true = 0.05       # process noise standard deviation
 q2_true = 0.05      # process noise standard deviation
 q3_true = 0.005       # process noise standard deviation
@@ -186,15 +187,17 @@ u = np.reshape(u, (Nu,T))
 for k in range(T):
     # x1[k+1] = ssm1(x1[k],x2[k],u[k]) + w1[k]
     # x2[k+1] = ssm2(x1[k],x2[k],u[k]) + w2[k]
-    z_sim[:,:,k+1] = sim(z_sim[:,:,k],u[:,[k]],w_sim[:,:,[k]],theta_true)
-
+    z_sim[:,:,[k+1]] = sim(z_sim[:,:,k],u[:,[k]],w_sim[:,:,[k]],theta_true)
+# z_sim[:,:,1:] = sim(z_sim[:,:,0],u,w_sim,theta_true)
 # simulate measurements
-v = np.zeros((1,T), dtype=float)
+v = np.zeros((3,T), dtype=float)
 v[0,:] = np.random.normal(0.0, r1_true, T)
+v[0,:] = np.random.normal(0.0, r2_true, T)
+v[0,:] = np.random.normal(0.0, r3_true, T)
 # v[1,:] = np.random.normal(0.0, r2_true, T)
-y = np.zeros((1,T), dtype=float)
-y[0,:] = z_sim[0,:,:-1]
-# y[1,:] = (-k_true*z_sim[0,:-1] -b_true*z_sim[1,:-1] + u[0,:])/m_true
+y = np.zeros((3,T), dtype=float)
+y[0:2,:] = z_sim[0:2,0,:-1]
+y[2,:] = (u[0,:] - theta_true['Km'] * z_sim[2,0,:-1]) / theta_true['Rm']
 y = y + v; # add noise
 
 plt.subplot(2,1,1)
