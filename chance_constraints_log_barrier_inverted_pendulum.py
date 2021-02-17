@@ -33,6 +33,7 @@ import matplotlib.pyplot as plt
 from helpers import plot_trace, col_vec, row_vec
 from pathlib import Path
 import pickle
+import math
 
 # jax related imports
 import jax.numpy as jnp
@@ -123,7 +124,7 @@ def fill_theta(t):
     t['0.5 * Mp * Lp * g'] = 0.5 * Mp * Lp * g
     return t
 
-def gradient(xt,u,t): # t is theta, this is for QUBE
+def qube_gradient(xt,u,t): # t is theta, this is for QUBE
     cos_xt1 = jnp.cos(xt[1,:]) # there are 5 of these
     sin_xt1 = jnp.sin(xt[1,:]) # there are 4 of these
     m11 = t['Jr + Mp * Lr * Lr'] + t['0.25 * Mp * Lp * Lp'] - t['0.25 * Mp * Lp * Lp'] * cos_xt1 * cos_xt1
@@ -142,10 +143,10 @@ def gradient(xt,u,t): # t is theta, this is for QUBE
     
 def rk4(xt,ut,theta):
     h = theta['h']
-    k1 = gradient(xt,ut,theta)
-    k2 = gradient(xt + k1*h/2,ut,theta)
-    k3 = gradient(xt + k2*h/2,ut,theta)
-    k4 = gradient(xt + k3*h,ut,theta)
+    k1 = qube_gradient(xt,ut,theta)
+    k2 = qube_gradient(xt + k1*h/2,ut,theta)
+    k3 = qube_gradient(xt + k2*h/2,ut,theta)
+    k4 = qube_gradient(xt + k3*h,ut,theta)
     return xt + (k1/6 + k2/3 + k3/3 + k4/6)*h # should handle a 2D x just fine
 
 def pend_simulate(xt,u,w,theta):# w is expected to be 3D. xt is expected to be 2D. ut is expected to be 2d but also, should handle being a vector (3d)
@@ -217,6 +218,10 @@ plt.tight_layout()
 plt.show()
 
 #----------- USE HMC TO PERFORM INFERENCE ---------------------------#
+
+fit_name = 'inverted_pendulum_fit'
+fit_path = 'stan_fits/'
+dont_stan = True
 # avoid recompiling
 model_name = 'pendulum_diag'
 path = 'stan/'
@@ -227,107 +232,119 @@ else:
     with open(path+model_name+'.pkl', 'wb') as file:
         pickle.dump(model, file)
 
-no_obs = y.shape[1]
+if Path(fit_path+fit_name+'.pkl').is_file() & dont_stan:
+    # avoid redoing HMC
+    fit = pickle.load(open(fit_path+fit_name+'.pkl', 'rb'))
+    no_obs = y.shape[1]
+    traces = fit.extract()
+    theta = traces['theta']
+    z = traces['h'][:,:,:no_obs]
 
-stan_data ={'no_obs': no_obs,
-             'Ts':Ts,
-             'y': y,
-             'u': u.flatten(),
-             'Lr':Lr_true,
-             'Mp':mp_true,
-             'Lp':Lp_true,
-             'g':grav,
-             'theta_p_mu':np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
-             'theta_p_std':0.5*np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
-             'r_p_mu': np.array([r1_true, r2_true, r3_true]),
-             'r_p_std': 0.5*np.array([r1_true, r2_true, r3_true]),
-             'q_p_mu': np.array([q1_true, q2_true, q3_true, q4_true]),
-             'q_p_std': np.array([q1_true, q2_true, 0.5*q3_true, 0.5*q3_true]),
-             }
+    theta_mean = np.mean(theta,0)
+    z_mean = np.mean(z,0)
 
-control = {"adapt_delta": 0.85,
-           "max_treedepth":13}         # increasing from default 0.8 to reduce divergent steps
+else:
+    no_obs = y.shape[1]
+    stan_data ={'no_obs': no_obs,
+                'Ts':Ts,
+                'y': y,
+                'u': u.flatten(),
+                'Lr':Lr_true,
+                'Mp':mp_true,
+                'Lp':Lp_true,
+                'g':grav,
+                'theta_p_mu':np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
+                'theta_p_std':0.5*np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
+                'r_p_mu': np.array([r1_true, r2_true, r3_true]),
+                'r_p_std': 0.5*np.array([r1_true, r2_true, r3_true]),
+                'q_p_mu': np.array([q1_true, q2_true, q3_true, q4_true]),
+                'q_p_std': np.array([q1_true, q2_true, 0.5*q3_true, 0.5*q3_true]),
+                }
 
-# Determine initialisation for the chains
-# state initialisation point (initlaise based off measurements)
-z_init = np.zeros((4,no_obs+1))
-z_init[0,:-1] = y[0,:]
-z_init[1,:-1] = y[1,:]
-z_init[0,-1] = y[0,-1]      # repeat last entry
-z_init[1,-1] = y[1,-1]      # repeat last entry
-z_init[2,:-1] = np.gradient(y[0,:])/Ts
-z_init[2,-1] = z_init[2,-2]
-z_init[3,:-1] = np.gradient(y[1,:])/Ts
-z_init[3,-1] = z_init[3,-2]
+    control = {"adapt_delta": 0.85,
+            "max_treedepth":13}         # increasing from default 0.8 to reduce divergent steps
 
-# parameter chain initialisation (going to start at true values +/- 20 percent)
-theta0 = np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true])
+    # Determine initialisation for the chains
+    # state initialisation point (initlaise based off measurements)
+    z_init = np.zeros((4,no_obs+1))
+    z_init[0,:-1] = y[0,:]
+    z_init[1,:-1] = y[1,:]
+    z_init[0,-1] = y[0,-1]      # repeat last entry
+    z_init[1,-1] = y[1,-1]      # repeat last entry
+    z_init[2,:-1] = np.gradient(y[0,:])/Ts
+    z_init[2,-1] = z_init[2,-2]
+    z_init[3,:-1] = np.gradient(y[1,:])/Ts
+    z_init[3,-1] = z_init[3,-2]
 
-def init_function():
-    output = dict(theta=theta0.flatten() * np.random.uniform(0.8,1.2,np.shape(theta0.flatten())),
-                  h=z_init + np.random.normal(0.0,0.1,np.shape(z_init)),
-                  )
-    return output
+    # parameter chain initialisation (going to start at true values +/- 20 percent)
+    theta0 = np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true])
 
-
-fit = model.sampling(data=stan_data, warmup=1000, iter=1200, chains=4,control=control, init=init_function)
-
-traces = fit.extract()
+    def init_function():
+        output = dict(theta=theta0.flatten() * np.random.uniform(0.8,1.2,np.shape(theta0.flatten())),
+                    h=z_init + np.random.normal(0.0,0.1,np.shape(z_init)),
+                    )
+        return output
 
 
-theta = traces['theta']
-z = traces['h'][:,:,:no_obs]
+    fit = model.sampling(data=stan_data, warmup=1000, iter=1200, chains=4,control=control, init=init_function)
 
-theta_mean = np.mean(theta,0)
-z_mean = np.mean(z,0)
+    with open(fit_path+fit_name+'.pkl', 'wb') as file:
+        pickle.dump(fit, file)
 
-# LQ = traces['LQ']
-# LQ_mean = np.mean(LQ,0)
-# LR = traces['LR']
-# LR_mean = np.mean(LR,0)
-#
-# R = np.matmul(LR_mean, LR_mean.T)
-# Q = np.matmul(LQ_mean, LQ_mean.T)
+    traces = fit.extract()
 
-plot_trace(theta[:,0],3,1,'Jr')
-plot_trace(theta[:,1],3,2,'Jp')
-plot_trace(theta[:,2],3,3,'Km')
-plt.show()
+    theta = traces['theta']
+    z = traces['h'][:,:,:no_obs]
 
-plot_trace(theta[:,3],3,1,'Rm')
-plot_trace(theta[:,4],3,2,'Dp')
-plot_trace(theta[:,5],3,3,'Dr')
-plt.show()
+    theta_mean = np.mean(theta,0)
+    z_mean = np.mean(z,0)
 
-plt.subplot(2,2,1)
-plt.plot(y[0,:])
-plt.plot(z_mean[0,:])
-plt.xlabel('time')
-plt.ylabel(r'arm angle $\theta$')
-plt.legend(['Measurements','mean estimate'])
+    # LQ = traces['LQ']
+    # LQ_mean = np.mean(LQ,0)
+    # LR = traces['LR']
+    # LR_mean = np.mean(LR,0)
+    #
+    # R = np.matmul(LR_mean, LR_mean.T)
+    # Q = np.matmul(LQ_mean, LQ_mean.T)
 
-plt.subplot(2,2,2)
-plt.plot(y[1,:])
-plt.plot(z_mean[1,:])
-plt.xlabel('time')
-plt.ylabel(r'pendulum angle $\alpha$')
-plt.legend(['Measurements','mean estimate'])
+    plot_trace(theta[:,0],3,1,'Jr')
+    plot_trace(theta[:,1],3,2,'Jp')
+    plot_trace(theta[:,2],3,3,'Km')
+    plt.show()
 
-plt.subplot(2,2,3)
-plt.plot(z_init[2,:])
-plt.plot(z_mean[2,:])
-plt.xlabel('time')
-plt.ylabel(r'arm angular velocity $\dot{\theta}$')
-plt.legend(['Grad measurements','mean estimate'])
+    plot_trace(theta[:,3],3,1,'Rm')
+    plot_trace(theta[:,4],3,2,'Dp')
+    plot_trace(theta[:,5],3,3,'Dr')
+    plt.show()
 
-plt.subplot(2,2,4)
-plt.plot(z_init[3,:])
-plt.plot(z_mean[3,:])
-plt.xlabel('time')
-plt.ylabel(r'pendulum angular velocity $\dot{\alpha}$')
-plt.legend(['Grad measurements','mean estimate'])
-plt.show()
+    plt.subplot(2,2,1)
+    plt.plot(y[0,:])
+    plt.plot(z_mean[0,:])
+    plt.xlabel('time')
+    plt.ylabel(r'arm angle $\theta$')
+    plt.legend(['Measurements','mean estimate'])
 
+    plt.subplot(2,2,2)
+    plt.plot(y[1,:])
+    plt.plot(z_mean[1,:])
+    plt.xlabel('time')
+    plt.ylabel(r'pendulum angle $\alpha$')
+    plt.legend(['Measurements','mean estimate'])
+
+    plt.subplot(2,2,3)
+    plt.plot(z_init[2,:])
+    plt.plot(z_mean[2,:])
+    plt.xlabel('time')
+    plt.ylabel(r'arm angular velocity $\dot{\theta}$')
+    plt.legend(['Grad measurements','mean estimate'])
+
+    plt.subplot(2,2,4)
+    plt.plot(z_init[3,:])
+    plt.plot(z_mean[3,:])
+    plt.xlabel('time')
+    plt.ylabel(r'pendulum angular velocity $\dot{\alpha}$')
+    plt.legend(['Grad measurements','mean estimate'])
+    plt.show()
 
 
 # state samples
@@ -374,21 +391,36 @@ r_samps = np.transpose(traces['r'],(1,0))
 # plt.show()
 
 #
-# # downsample the the HMC output since for illustration purposes we sampled > M
-# ind = np.random.choice(len(m_samps), Ns, replace=False)
-# m_mpc = m_samps[ind]  # same indices for all to ensure they correpond to the same realisation from dist
-# k_mpc = k_samps[ind]
-# b_mpc = b_samps[ind]
-# q_mpc = q_samps[:,ind]
-# r_mpc = r_samps[:,ind]
-# zt = z_samps[:,ind,-1]  # inferred state for current time step
+# downsample the the HMC output since for illustration purposes we sampled > M
+ind = np.random.choice(len(Jr_samps), Ns, replace=False)
+theta_mpc = {
+        'Mp': mp_true,
+        'Lp': Lp_true,
+        'Lr': Lr_true,
+        'Jr': Jr_samps[ind],
+        'Jp': Jp_samps[ind],
+        'Km': Km_samps[ind],
+        'Rm': Rm_samps[ind],
+        'Dp': Dp_samps[ind],
+        'Dr': Dr_samps[ind],
+        'g': grav,
+        'h': Ts
+}
+
+theta_mpc = fill_theta(theta_mpc)
+
+q_mpc = q_samps[:,ind]
+r_mpc = r_samps[:,ind]
+zt = z_samps[:,ind,-1]  # inferred state for current time step
 #
-# # predraw noise from sampled q! --> Ns number of Nh long scenarios assocation with a particular q
-# w_mpc = np.zeros((Nx,Ns,Nh+1),dtype=float)
-# w_mpc[0,:,:] = np.expand_dims(col_vec(q_mpc[0,:]) * np.random.randn(Ns, Nh+1), 0)  # uses the sampled stds, need to sample for x_t to x_{t+N+1}
-# w_mpc[1,:,:] = np.expand_dims(col_vec(q_mpc[1,:]) * np.random.randn(Ns, Nh+1), 0)
-# # ut = u[:,-1]
-# ut = np.expand_dims(u[:,-1], axis=1)      # control action that was just applied
+# predraw noise from sampled q! --> Ns number of Nh long scenarios assocation with a particular q
+w_mpc = np.zeros((Nx,Ns,Nh+1),dtype=float)
+w_mpc[0,:,:] = np.expand_dims(col_vec(q_mpc[0,:]) * np.random.randn(Ns, Nh+1), 0)  # uses the sampled stds, need to sample for x_t to x_{t+N+1}
+w_mpc[1,:,:] = np.expand_dims(col_vec(q_mpc[1,:]) * np.random.randn(Ns, Nh+1), 0)
+w_mpc[2,:,:] = np.expand_dims(col_vec(q_mpc[2,:]) * np.random.randn(Ns, Nh+1), 0)
+w_mpc[3,:,:] = np.expand_dims(col_vec(q_mpc[3,:]) * np.random.randn(Ns, Nh+1), 0)
+# ut = u[:,-1]
+ut = np.expand_dims(u[:,-1], axis=1)      # control action that was just applied
 #
 # # At this point I have:
 # # zt which is the current inferred state, and is [Nx,Ns]: Ns samples of Nx column vector
@@ -434,28 +466,30 @@ r_samps = np.transpose(traces['r'],(1,0))
 # # x_{t+1},...,x_{t+N}, x_{t+N+1} that requires u to consist of u_t and uc [Nu,N]
 #
 #
-# # compile cost and create gradient and hessian functions
-# cost = jit(log_barrier_cost, static_argnums=(11,12,13, 14, 15))  # static argnums means it will recompile if N changes
-# gradient = jit(grad(log_barrier_cost, argnums=0), static_argnums=(11, 12, 13, 14, 15))    # get compiled function to return gradients with respect to z (uc, s)
-# hessian = jit(jacfwd(jacrev(log_barrier_cost, argnums=0)), static_argnums=(11, 12, 13, 14, 15))
+# compile cost and create gradient and hessian functions
+cost = jit(log_barrier_cost, static_argnums=(11,12,13, 14, 15))  # static argnums means it will recompile if N changes
+gradient = jit(grad(log_barrier_cost, argnums=0), static_argnums=(11, 12, 13, 14, 15))    # get compiled function to return gradients with respect to z (uc, s)
+hessian = jit(jacfwd(jacrev(log_barrier_cost, argnums=0)), static_argnums=(11, 12, 13, 14, 15))
 #
 #
-# # define some optimisation settings
-# mu = 1e4
-# gamma = 1
-# delta = 0.05
-# # delta = np.linspace(0.05,0.2,N)     # varying the requried probabilistic satisfaction
-# max_iter = 1000
+# define some optimisation settings
+mu = 1e4
+gamma = 1
+delta = 0.05
+# delta = np.linspace(0.05,0.2,N)     # varying the requried probabilistic satisfaction
+max_iter = 1000
+
+
+# define some state constraints, (these need to be tuples (so trailing comma))
+z_ub = jnp.array([[100.],[0.75*math.pi],[100.],[100.]])
+z_lb = jnp.array([[-100.],[-0.75*math.pi],[-100.],[-100.]])
 #
-#
-# # define some state constraints, (these need to be tuples (so trailing comma))
-# z_ub = jnp.array([[1.0],[100.]])
-#
-# # an array of size [o,M,N+1], z_ub is size [2,1]
-# state_constraints = (lambda z: jnp.expand_dims(z_ub,2) - z,)
-# # state_constraints = ()
-# input_constraints = (lambda u: 5.0 - u,)
-# # input_constraints = ()
+# an array of size [o,M,N+1], z_ub is size [2,1]
+state_constraints = (lambda z: jnp.expand_dims(z_ub,2) - z,
+                     lambda z: -jnp.expand_dims(z_lb,2) + z,)
+# state_constraints = ()
+input_constraints = (lambda u: 5.0 - u,)
+# input_constraints = ()
 #
 # theta = {'m':m_mpc,
 #          'k':k_mpc,
@@ -465,38 +499,38 @@ r_samps = np.transpose(traces['r'],(1,0))
 #
 #
 # # solve mpc optimisation problem
-# result = solve_chance_logbarrier(np.zeros((1,Nh)), cost, gradient, hessian, ut, zt, theta, w_mpc, z_star, sqc, src,
-#                             delta, msd_simulate, state_constraints, input_constraints, verbose=2)
+result = solve_chance_logbarrier(np.zeros((1,Nh)), cost, gradient, hessian, ut, zt, theta_mpc, w_mpc, z_star, sqc, src,
+                            delta, pend_simulate, state_constraints, input_constraints, verbose=2)
+
+uc = result['uc']
 #
-# uc = result['uc']
+if len(state_constraints) > 0:
+    x_mpc = sim(zt, np.hstack([ut, uc]), w_mpc, theta_mpc)
+    hx = np.concatenate([state_constraint(x_mpc[:, :, 1:]) for state_constraint in state_constraints], axis=2)
+    cx = np.mean(hx > 0, axis=1)
+    print('State constraint satisfaction')
+    print(cx)
+if len(input_constraints) > 0:
+    cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints],axis=1)
+    print('Input constraint satisfaction')
+    print(cu >= 0)
 #
-# if len(state_constraints) > 0:
-#     x_mpc = msd_simulate(zt, np.hstack([ut, uc]), w_mpc, theta)
-#     hx = np.concatenate([state_constraint(x_mpc[:, :, 1:]) for state_constraint in state_constraints], axis=2)
-#     cx = np.mean(hx > 0, axis=1)
-#     print('State constraint satisfaction')
-#     print(cx)
-# if len(input_constraints) > 0:
-#     cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints],axis=1)
-#     print('Input constraint satisfaction')
-#     print(cu >= 0)
-# #
-# for i in range(6):
-#     plt.subplot(2,3,i+1)
-#     plt.hist(x_mpc[0,:, i*3], label='MC forward sim')
-#     if i==1:
-#         plt.title('MPC solution over horizon')
-#     # plt.axvline(x_star, linestyle='--', color='g', linewidth=2, label='target')
-#     # plt.axvline(x_ub, linestyle='--', color='r', linewidth=2, label='upper bound')
-#     plt.xlabel('t+'+str(i*3+1))
-# plt.tight_layout()
-# plt.legend()
-# plt.show()
-#
-# plt.plot(uc[0,:])
-# plt.title('MPC determined control action')
-# plt.show()
-#
+for i in range(6):
+    plt.subplot(2,3,i+1)
+    plt.hist(x_mpc[0,:, i*3], label='MC forward sim')
+    if i==1:
+        plt.title('MPC solution over horizon')
+    # plt.axvline(x_star, linestyle='--', color='g', linewidth=2, label='target')
+    # plt.axvline(x_ub, linestyle='--', color='r', linewidth=2, label='upper bound')
+    plt.xlabel('t+'+str(i*3+1))
+plt.tight_layout()
+plt.legend()
+plt.show()
+
+plt.plot(uc[0,:])
+plt.title('MPC determined control action')
+plt.show()
+
 #
 #
 #
