@@ -200,7 +200,7 @@ for k in range(T):
 # v[1,:] = np.random.normal(0.0, r2_true, T)
 # v[2,:] = np.random.normal(0.0, r3_true, T)
 v = np.array([[r1_true],[r2_true],[r3_true]])*np.random.randn(3,T)
-y = np.zeros((3,T), dtype=float)Ts = 0.008
+y = np.zeros((3,T), dtype=float)
 y[0:2,:] = z_sim[0:2,0,:-1]
 y[2,:] = (u[0,:] - theta_true['Km'] * z_sim[2,0,:-1]) / theta_true['Rm']
 y = y + v           # add noise
