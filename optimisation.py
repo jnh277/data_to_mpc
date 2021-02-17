@@ -66,7 +66,7 @@ def log_barrier_cost(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, gamma, si
     """
 
 
-    print('Compiling log barrier cost')
+    # print('Compiling log barrier cost')
     ncu = len(input_constraints)    # number of input constraints
     ncx = len(state_constraints)    # number of state constraints
 
@@ -166,7 +166,8 @@ def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_st
         'newton_decrement': calculated as np.dot(g,p)
 
     """
-    print('Starting optimisation')
+    if verbose:
+        print('Starting optimisation')
 
     o,N = w.shape[0],w.shape[2]-1
     Nu = uc0.shape[0]             # input dimension
@@ -193,13 +194,17 @@ def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_st
         # calculate newton decrement
         nd = np.dot(p,g)
         # check that we have a valid search direction and if not then fix
-        if nd >= 0:
+        if nd >= -1e-8:
             [d, v] = np.linalg.eig(h)
             ind = d < 1e-6
             d[ind] = 1e-6 + np.abs(d[ind])
             hn = v @ np.diag(d) @ v.T
             p = - np.linalg.solve(hn, g)
             nd = np.dot(p,g)
+            if jnp.iscomplex(nd):
+                status=6
+                print('search direction became complex valued')
+                break
 
         # perform line search
         alpha = 1.0
