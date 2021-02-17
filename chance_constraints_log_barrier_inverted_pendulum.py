@@ -68,6 +68,7 @@ z4_0 = 0.0
 
 r1_true = 0.01        # measurement noise standard deviation
 r2_true = 0.01
+r3_true = 0.01
 q1_true = 0.05       # process noise standard deviation
 q2_true = 0.05      # process noise standard deviation
 q3_true = 0.005       # process noise standard deviation
@@ -141,15 +142,19 @@ def rk4(xt,ut,theta):
     k2 = gradient(xt + k1*h/2,ut,theta)
     k3 = gradient(xt + k2*h/2,ut,theta)
     k4 = gradient(xt + k3*h,ut,theta)
-    return xt + (k1/6 + k2/3 + k3/3 + k4/6)*h
+    return xt + (k1/6 + k2/3 + k3/3 + k4/6)*h # should handle a 2D x just fine
 
-def pend_simulate(xt,u,w,theta):
+def pend_simulate(xt,u,w,theta):# w is expected to be 3D. xt is expected to be 2D. ut is expected to be 2d but also, should handle being a vector (3d)
     [Nx,Ns,Np1] = w.shape
+    if u.ndim == 2:
+        Nu = u.shape[1]
+        if Nu != Np1:
+            print('wyd??')
     x = jnp.zeros((Nx, Ns, Np1+1))
-    x = index_update(x, index[:, :, 0], xt[:,:,0])
+    x = index_update(x, index[:, :, 0], xt)
     for ii in range(Np1):
-        x = index_update(x, index[:, :, ii+1], rk4(x[:,:,ii],u[:,ii],theta) + w[:, :, ii])
-    return x[:, :, 1:]  
+        x = index_update(x, index[:, :, ii+1], rk4(x[:,:,ii],u[:,ii],theta) + w[:, :, ii]) # slicing creates 2d x into 3d x. Also, Np1 loop will consume all of w
+    return x[:, :, 1:]  # return everything except xt 
 
 # compile cost and create gradient and hessian functions
 sim = jit(pend_simulate)  # static argnums means it will recompile if N changes
@@ -182,15 +187,17 @@ u = np.reshape(u, (Nu,T))
 for k in range(T):
     # x1[k+1] = ssm1(x1[k],x2[k],u[k]) + w1[k]
     # x2[k+1] = ssm2(x1[k],x2[k],u[k]) + w2[k]
-    z_sim[:,:,[k+1]] = sim(z_sim[:,:,[k]],u[:,[k]],w_sim[:,:,[k]],theta_true)
-
+    z_sim[:,:,[k+1]] = sim(z_sim[:,:,k],u[:,[k]],w_sim[:,:,[k]],theta_true)
+# z_sim[:,:,1:] = sim(z_sim[:,:,0],u,w_sim,theta_true)
 # simulate measurements
-v = np.zeros((1,T), dtype=float)
+v = np.zeros((3,T), dtype=float)
 v[0,:] = np.random.normal(0.0, r1_true, T)
+v[0,:] = np.random.normal(0.0, r2_true, T)
+v[0,:] = np.random.normal(0.0, r3_true, T)
 # v[1,:] = np.random.normal(0.0, r2_true, T)
-y = np.zeros((1,T), dtype=float)
-y[0,:] = z_sim[0,:,:-1]
-# y[1,:] = (-k_true*z_sim[0,:-1] -b_true*z_sim[1,:-1] + u[0,:])/m_true
+y = np.zeros((3,T), dtype=float)
+y[0:2,:] = z_sim[0:2,0,:-1]
+y[2,:] = (u[0,:] - theta_true['Km'] * z_sim[2,0,:-1]) / theta_true['Rm']
 y = y + v; # add noise
 
 plt.subplot(2,1,1)
