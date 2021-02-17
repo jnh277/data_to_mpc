@@ -98,8 +98,8 @@ parameters {
     matrix[4,no_obs+1] h;                     // hidden states
     vector<lower=0.0>[6] theta;             // the parameters  [Jr, Jp, Km, Rm, Dp, Dr]
 //    vector[4] z0;                           // initial state guess
-    vector<lower=0.0>[3] r;                 // independent measurement noise variances
-    vector<lower=0.0>[4] q;                 // independent process noise variances
+    vector<lower=1e-8>[3] r;                 // independent measurement noise variances
+    vector<lower=1e-8>[4] q;                 // independent process noise variances
 
 }
 transformed parameters {
@@ -121,8 +121,8 @@ model {
     // parameter priors
     theta ~ normal(theta_p_mu, theta_p_std);
 
-    // initial state prior
-    h[:,1] ~ normal(z0_mu, z0_std);      //
+    // initial state prior (Not using this / not needed)
+//    h[:,1] ~ normal(z0_mu, z0_std);      //
 
     // independent process likelihoods
     h[1,2:no_obs+1] ~ normal(mu[1,:], q[1]);
