@@ -197,11 +197,10 @@ for k in range(T):
 # simulate measurements
 # v = np.zeros((3,T), dtype=float) # TODO: This is a terrible way of doing this lol
 # v[0,:] = np.random.normal(0.0, r1_true, T)
-# v[0,:] = np.random.normal(0.0, r2_true, T)
-# v[0,:] = np.random.normal(0.0, r3_true, T)
+# v[1,:] = np.random.normal(0.0, r2_true, T)
+# v[2,:] = np.random.normal(0.0, r3_true, T)
 v = np.array([[r1_true],[r2_true],[r3_true]])*np.random.randn(3,T)
-
-y = np.zeros((3,T), dtype=float)
+y = np.zeros((3,T), dtype=float)Ts = 0.008
 y[0:2,:] = z_sim[0:2,0,:-1]
 y[2,:] = (u[0,:] - theta_true['Km'] * z_sim[2,0,:-1]) / theta_true['Rm']
 y = y + v           # add noise
@@ -332,23 +331,26 @@ plt.show()
 
 
 # state samples
-# z_samps = np.transpose(traces['z'],(1,0,2)) # Ns, Nx, T --> Nx, Ns, T
+z_samps = np.transpose(z,(1,0,2)) # Ns, Nx, T --> Nx, Ns, T
 
+# parameter samples
+Jr_samps = theta[:,0].squeeze()
+Jp_samps = theta[:,1].squeeze()
+Km_samps = theta[:,2].squeeze()
+Rm_samps = theta[:,3].squeeze()
+Dp_samps = theta[:,4].squeeze()
+Dr_samps = theta[:,5].squeeze()
+q_samps = np.transpose(traces['q'],(1,0))
+r_samps = np.transpose(traces['r'],(1,0))
 
-# # parameter samples
-# m_samps = traces['m'].squeeze()
-# k_samps = traces['k'].squeeze()
-# b_samps = traces['b'].squeeze() # single valued parameters shall 1D numpy objects! The squeeze has been squoze
-# q_samps = np.transpose(traces['q'],(1,0))
-# r_samps = np.transpose(traces['r'],(1,0))
-#
 # # plot the initial parameter marginal estimates
 # q1plt = q_samps[0,:].squeeze()
 # q2plt = q_samps[1,:].squeeze()
+# q3plt = q_samps[2,:].squeeze()
 # r1plt = r_samps[0,:].squeeze()
 # r2plt = r_samps[1,:].squeeze()
-#
-#
+# q3plt = q_samps[2,:].squeeze()
+
 # plot_trace(m_samps,2,4,1,'m')
 # plt.title('HMC inferred parameters')
 # plot_trace(k_samps,2,4,2,'k')
