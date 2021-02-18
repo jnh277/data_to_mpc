@@ -53,7 +53,7 @@ config.update("jax_enable_x64", True)           # run jax in 64 bit mode for acc
 # Control parameters
 z_star = np.array([[0],[np.pi],[0.0],[0.0]],dtype=float)        # desired set point in z1
 Ns = 200             # number of samples we will use for MC MPC
-Nh = 80              # horizonline of MPC algorithm
+Nh = 20              # horizonline of MPC algorithm
 sqc_v = np.array([1,10.0,1e-5,1e-5],dtype=float)            # cost on state error
 sqc = np.diag(sqc_v)
 # src_v = np.array([1.0,1.0],dtype=float)
@@ -62,7 +62,7 @@ src = np.array([[0.001]])
 
 # simulation parameters
 T = 100             # number of time steps to simulate and record measurements for
-Ts = 0.008
+Ts = 0.025
 z1_0 = np.pi/4            # initial states
 z2_0 = np.pi/4
 z3_0 = 0.0
@@ -222,7 +222,7 @@ plt.show()
 trace_name = 'inverted_pendulum_trace'
 trace_path = 'stan_traces/'
 init_name = 'inverted_pendulum_init'
-dont_stan = False
+dont_stan = True
 
 
 if Path(trace_path+trace_name+'.pkl').is_file() & Path(trace_path+init_name+'.pkl').is_file() & dont_stan:
@@ -516,7 +516,7 @@ if len(input_constraints) > 0:
 #
 for i in range(6):
     plt.subplot(2,3,i+1)
-    plt.hist(x_mpc[1,:, i*8], label='MC forward sim')
+    plt.hist(x_mpc[1,:, i*3], label='MC forward sim')
     if i==1:
         plt.title('MPC solution over horizon')
     # plt.axvline(x_star, linestyle='--', color='g', linewidth=2, label='target')
@@ -530,6 +530,9 @@ plt.plot(uc[0,:-1])
 plt.title('MPC determined control action')
 plt.show()
 
+
+plt.plot(x_mpc[0,:,:].mean(axis=0))
+plt.show()
 
 plt.plot(x_mpc[1,:,:].mean(axis=0))
 plt.show()
