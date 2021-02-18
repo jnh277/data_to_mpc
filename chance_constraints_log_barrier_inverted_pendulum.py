@@ -219,25 +219,10 @@ plt.show()
 
 #----------- USE HMC TO PERFORM INFERENCE ---------------------------#
 
-<<<<<<< HEAD
 trace_name = 'inverted_pendulum_trace'
 trace_path = 'stan_traces/'
 init_name = 'inverted_pendulum_init'
 dont_stan = False
-=======
-fit_name = 'inverted_pendulum_fit'
-fit_path = 'stan_fits/'
-dont_stan = True
-# avoid recompiling
-model_name = 'pendulum_diag'
-path = 'stan/'
-if Path(path+model_name+'.pkl').is_file():
-    model = pickle.load(open(path+model_name+'.pkl', 'rb'))
-else:
-    model = pystan.StanModel(file=path+model_name+'.stan')
-    with open(path+model_name+'.pkl', 'wb') as file:
-        pickle.dump(model, file)
->>>>>>> 2ee3f1d58a77c1f20d77b82ab567cdaa68e0828a
 
 
 if Path(trace_path+trace_name+'.pkl').is_file() & Path(trace_path+init_name+'.pkl').is_file() & dont_stan:
