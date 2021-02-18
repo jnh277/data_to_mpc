@@ -199,7 +199,7 @@ def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_st
             [d, v] = np.linalg.eig(h)
             if np.iscomplex(d).any():       # stop complex eigenvalues
                 d = np.real(d)
-                v = np.real(d)
+                v = np.real(v)
             ind = d < 1e-6
             d[ind] = 1e-6 + np.abs(d[ind])
             hn = v @ np.diag(d) @ v.T
