@@ -53,8 +53,8 @@ config.update("jax_enable_x64", True)           # run jax in 64 bit mode for acc
 # Control parameters
 z_star = np.array([[0],[np.pi],[0.0],[0.0]],dtype=float)        # desired set point in z1
 Ns = 200             # number of samples we will use for MC MPC
-Nh = 50              # horizonline of MPC algorithm
-sqc_v = np.array([0.01,10.0,0.001,0.001],dtype=float)            # cost on state error
+Nh = 80              # horizonline of MPC algorithm
+sqc_v = np.array([1,10.0,1e-5,1e-5],dtype=float)            # cost on state error
 sqc = np.diag(sqc_v)
 # src_v = np.array([1.0,1.0],dtype=float)
 # src = np.diag(src_v)            # cost on control action
@@ -219,10 +219,25 @@ plt.show()
 
 #----------- USE HMC TO PERFORM INFERENCE ---------------------------#
 
+<<<<<<< HEAD
 trace_name = 'inverted_pendulum_trace'
 trace_path = 'stan_traces/'
 init_name = 'inverted_pendulum_init'
 dont_stan = False
+=======
+fit_name = 'inverted_pendulum_fit'
+fit_path = 'stan_fits/'
+dont_stan = True
+# avoid recompiling
+model_name = 'pendulum_diag'
+path = 'stan/'
+if Path(path+model_name+'.pkl').is_file():
+    model = pickle.load(open(path+model_name+'.pkl', 'rb'))
+else:
+    model = pystan.StanModel(file=path+model_name+'.stan')
+    with open(path+model_name+'.pkl', 'wb') as file:
+        pickle.dump(model, file)
+>>>>>>> 2ee3f1d58a77c1f20d77b82ab567cdaa68e0828a
 
 
 if Path(trace_path+trace_name+'.pkl').is_file() & Path(trace_path+init_name+'.pkl').is_file() & dont_stan:
@@ -485,9 +500,9 @@ z_lb = jnp.array([[-100.],[-0.75*math.pi],[-100.],[-100.]])
 #
 # an array of size [o,M,N+1], z_ub is size [2,1]
 
-state_constraints = (lambda z: 1000. - z,)
+state_constraints = (lambda z: 1000. - z,lambda z: z + 1000.)
 # state_constraints = ()
-input_constraints = (lambda u: 1000. - u,)
+input_constraints = (lambda u: 18. - u, lambda u: u + 18.)
 # input_constraints = ()
 #
 # theta = {'m':m_mpc,
@@ -526,10 +541,13 @@ plt.tight_layout()
 plt.legend()
 plt.show()
 
-plt.plot(uc[0,:])
+plt.plot(uc[0,:-1])
 plt.title('MPC determined control action')
 plt.show()
 
+
+plt.plot(x_mpc[1,:,:].mean(axis=0))
+plt.show()
 #
 #
 #
