@@ -219,31 +219,28 @@ plt.show()
 
 #----------- USE HMC TO PERFORM INFERENCE ---------------------------#
 
-fit_name = 'inverted_pendulum_fit'
-fit_path = 'stan_fits/'
+trace_name = 'inverted_pendulum_trace'
+trace_path = 'stan_traces/'
+init_name = 'inverted_pendulum_init'
 dont_stan = True
-# avoid recompiling
-model_name = 'pendulum_diag'
-path = 'stan/'
-if Path(path+model_name+'.pkl').is_file():
-    model = pickle.load(open(path+model_name+'.pkl', 'rb'))
-else:
-    model = pystan.StanModel(file=path+model_name+'.stan')
-    with open(path+model_name+'.pkl', 'wb') as file:
-        pickle.dump(model, file)
 
-if Path(fit_path+fit_name+'.pkl').is_file() & dont_stan:
+
+if Path(trace_path+trace_name+'.pkl').is_file() & Path(trace_path+init_name+'.pkl').is_file() & dont_stan:
     # avoid redoing HMC
-    fit = pickle.load(open(fit_path+fit_name+'.pkl', 'rb'))
+    z_init = pickle.load(open(trace_path+init_name+'.pkl','rb'))
+    traces = pickle.load(open(trace_path+trace_name+'.pkl', 'rb'))
     no_obs = y.shape[1]
-    traces = fit.extract()
-    theta = traces['theta']
-    z = traces['h'][:,:,:no_obs]
-
-    theta_mean = np.mean(theta,0)
-    z_mean = np.mean(z,0)
 
 else:
+    # avoid recompiling
+    model_name = 'pendulum_diag'
+    path = 'stan/'
+    if Path(path+model_name+'.pkl').is_file():
+        model = pickle.load(open(path+model_name+'.pkl', 'rb'))
+    else:
+        model = pystan.StanModel(file=path+model_name+'.stan')
+        with open(path+model_name+'.pkl', 'wb') as file:
+            pickle.dump(model, file)
     no_obs = y.shape[1]
     stan_data ={'no_obs': no_obs,
                 'Ts':Ts,
@@ -289,63 +286,64 @@ else:
 
     fit = model.sampling(data=stan_data, warmup=1000, iter=1200, chains=4,control=control, init=init_function)
 
-    with open(fit_path+fit_name+'.pkl', 'wb') as file:
-        pickle.dump(fit, file)
-
     traces = fit.extract()
+    with open(trace_path+trace_name+'.pkl', 'wb') as file:
+        pickle.dump(traces, file)
+    with open(trace_path+init_name+'.pkl','wb') as file:
+        pickle.dump(z_init,file)
+    
 
-    theta = traces['theta']
-    z = traces['h'][:,:,:no_obs]
+theta = traces['theta']
+z = traces['h'][:,:,:no_obs]
+theta_mean = np.mean(theta,0)
+z_mean = np.mean(z,0)
 
-    theta_mean = np.mean(theta,0)
-    z_mean = np.mean(z,0)
+# LQ = traces['LQ']
+# LQ_mean = np.mean(LQ,0)
+# LR = traces['LR']
+# LR_mean = np.mean(LR,0)
+#
+# R = np.matmul(LR_mean, LR_mean.T)
+# Q = np.matmul(LQ_mean, LQ_mean.T)
 
-    # LQ = traces['LQ']
-    # LQ_mean = np.mean(LQ,0)
-    # LR = traces['LR']
-    # LR_mean = np.mean(LR,0)
-    #
-    # R = np.matmul(LR_mean, LR_mean.T)
-    # Q = np.matmul(LQ_mean, LQ_mean.T)
+plot_trace(theta[:,0],3,1,'Jr')
+plot_trace(theta[:,1],3,2,'Jp')
+plot_trace(theta[:,2],3,3,'Km')
+plt.show()
 
-    plot_trace(theta[:,0],3,1,'Jr')
-    plot_trace(theta[:,1],3,2,'Jp')
-    plot_trace(theta[:,2],3,3,'Km')
-    plt.show()
+plot_trace(theta[:,3],3,1,'Rm')
+plot_trace(theta[:,4],3,2,'Dp')
+plot_trace(theta[:,5],3,3,'Dr')
+plt.show()
 
-    plot_trace(theta[:,3],3,1,'Rm')
-    plot_trace(theta[:,4],3,2,'Dp')
-    plot_trace(theta[:,5],3,3,'Dr')
-    plt.show()
+plt.subplot(2,2,1)
+plt.plot(y[0,:])
+plt.plot(z_mean[0,:])
+plt.xlabel('time')
+plt.ylabel(r'arm angle $\theta$')
+plt.legend(['Measurements','mean estimate'])
 
-    plt.subplot(2,2,1)
-    plt.plot(y[0,:])
-    plt.plot(z_mean[0,:])
-    plt.xlabel('time')
-    plt.ylabel(r'arm angle $\theta$')
-    plt.legend(['Measurements','mean estimate'])
+plt.subplot(2,2,2)
+plt.plot(y[1,:])
+plt.plot(z_mean[1,:])
+plt.xlabel('time')
+plt.ylabel(r'pendulum angle $\alpha$')
+plt.legend(['Measurements','mean estimate'])
 
-    plt.subplot(2,2,2)
-    plt.plot(y[1,:])
-    plt.plot(z_mean[1,:])
-    plt.xlabel('time')
-    plt.ylabel(r'pendulum angle $\alpha$')
-    plt.legend(['Measurements','mean estimate'])
+plt.subplot(2,2,3)
+plt.plot(z_init[2,:])
+plt.plot(z_mean[2,:])
+plt.xlabel('time')
+plt.ylabel(r'arm angular velocity $\dot{\theta}$')
+plt.legend(['Grad measurements','mean estimate'])
 
-    plt.subplot(2,2,3)
-    plt.plot(z_init[2,:])
-    plt.plot(z_mean[2,:])
-    plt.xlabel('time')
-    plt.ylabel(r'arm angular velocity $\dot{\theta}$')
-    plt.legend(['Grad measurements','mean estimate'])
-
-    plt.subplot(2,2,4)
-    plt.plot(z_init[3,:])
-    plt.plot(z_mean[3,:])
-    plt.xlabel('time')
-    plt.ylabel(r'pendulum angular velocity $\dot{\alpha}$')
-    plt.legend(['Grad measurements','mean estimate'])
-    plt.show()
+plt.subplot(2,2,4)
+plt.plot(z_init[3,:])
+plt.plot(z_mean[3,:])
+plt.xlabel('time')
+plt.ylabel(r'pendulum angular velocity $\dot{\alpha}$')
+plt.legend(['Grad measurements','mean estimate'])
+plt.show()
 
 
 # state samples
@@ -535,6 +533,9 @@ plt.plot(uc[0,:-1])
 plt.title('MPC determined control action')
 plt.show()
 
+
+plt.plot(x_mpc[0,:,:].mean(axis=0))
+plt.show()
 
 plt.plot(x_mpc[1,:,:].mean(axis=0))
 plt.show()
