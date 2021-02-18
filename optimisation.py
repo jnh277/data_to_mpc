@@ -181,6 +181,7 @@ def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_st
 
     jmu = device_put(mu)
     jgamma = device_put(gamma)
+    status=7
 
     for i in range(max_iter):
         # compute cost, gradient, and hessian

@@ -51,14 +51,14 @@ config.update("jax_enable_x64", True)           # run jax in 64 bit mode for acc
 #----------------- Parameters ---------------------------------------------------#
 
 # Control parameters
-z_star = np.array([[3.141592654],[0.0],[0.0],[0.0]],dtype=float)        # desired set point in z1
+z_star = np.array([[0],[np.pi],[0.0],[0.0]],dtype=float)        # desired set point in z1
 Ns = 200             # number of samples we will use for MC MPC
-Nh = 20              # horizonline of MPC algorithm
-sqc_v = np.array([1.0,1.0,1.0,1.0],dtype=float)            # cost on state error
+Nh = 50              # horizonline of MPC algorithm
+sqc_v = np.array([0.01,10.0,0.001,0.001],dtype=float)            # cost on state error
 sqc = np.diag(sqc_v)
 # src_v = np.array([1.0,1.0],dtype=float)
 # src = np.diag(src_v)            # cost on control action
-src = np.array([[0.01]])
+src = np.array([[0.001]])
 
 # simulation parameters
 T = 100             # number of time steps to simulate and record measurements for
@@ -221,7 +221,7 @@ plt.show()
 
 fit_name = 'inverted_pendulum_fit'
 fit_path = 'stan_fits/'
-dont_stan = True
+dont_stan = False
 # avoid recompiling
 model_name = 'pendulum_diag'
 path = 'stan/'
@@ -254,7 +254,8 @@ else:
                 'Lp':Lp_true,
                 'g':grav,
                 'theta_p_mu':np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
-                'theta_p_std':0.5*np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
+                # 'theta_p_std':0.5*np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
+                'theta_p_std':0.1*np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
                 'r_p_mu': np.array([r1_true, r2_true, r3_true]),
                 'r_p_std': 0.5*np.array([r1_true, r2_true, r3_true]),
                 'q_p_mu': np.array([q1_true, q2_true, q3_true, q4_true]),
@@ -485,10 +486,10 @@ z_ub = jnp.array([[100.],[0.75*math.pi],[100.],[100.]])
 z_lb = jnp.array([[-100.],[-0.75*math.pi],[-100.],[-100.]])
 #
 # an array of size [o,M,N+1], z_ub is size [2,1]
-state_constraints = (lambda z: jnp.expand_dims(z_ub,2) - z,
-                     lambda z: -jnp.expand_dims(z_lb,2) + z,)
+
+state_constraints = (lambda z: 1000. - z,)
 # state_constraints = ()
-input_constraints = (lambda u: 5.0 - u,)
+input_constraints = (lambda u: 1000. - u,)
 # input_constraints = ()
 #
 # theta = {'m':m_mpc,
@@ -500,7 +501,7 @@ input_constraints = (lambda u: 5.0 - u,)
 #
 # # solve mpc optimisation problem
 result = solve_chance_logbarrier(np.zeros((1,Nh)), cost, gradient, hessian, ut, zt, theta_mpc, w_mpc, z_star, sqc, src,
-                            delta, pend_simulate, state_constraints, input_constraints, verbose=2)
+                            delta, pend_simulate, state_constraints, input_constraints, verbose=2, max_iter=10000)
 
 uc = result['uc']
 #
@@ -517,12 +518,12 @@ if len(input_constraints) > 0:
 #
 for i in range(6):
     plt.subplot(2,3,i+1)
-    plt.hist(x_mpc[0,:, i*3], label='MC forward sim')
+    plt.hist(x_mpc[1,:, i*8], label='MC forward sim')
     if i==1:
         plt.title('MPC solution over horizon')
     # plt.axvline(x_star, linestyle='--', color='g', linewidth=2, label='target')
     # plt.axvline(x_ub, linestyle='--', color='r', linewidth=2, label='upper bound')
-    plt.xlabel('t+'+str(i*3+1))
+    plt.xlabel('t+'+str(i*8+1))
 plt.tight_layout()
 plt.legend()
 plt.show()

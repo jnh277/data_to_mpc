@@ -26,7 +26,6 @@ functions{
 //        real p1 = -0.5*pdims[2]*(pdims[1]*log(2*pi()) + 2*sum(log(diagonal(LSigma))));
 //        real p2 = -0.5*sum(error_sc .* error_sc);
 //        return p1+p2;
-//
 //    }
     matrix process_model_vec(matrix z, row_vector u, vector theta, real Lr, real Mp, real Lp, real g){
     // theta = [Jr, Jp, Km, Rm, Dp, Dr]
