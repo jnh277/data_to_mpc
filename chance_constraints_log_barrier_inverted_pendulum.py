@@ -22,7 +22,6 @@ Uses JAX to compile and run code on GPU/CPU and provide gradients and hessians
 ## TODO list
 # refactor the parameters a little bit to put them into a dictionary, so that the same function can be used for the ssm simulator and the jax mpc simulator
 
-
 # general imports
 from numpy.core.numeric import zeros_like
 import pystan
@@ -54,8 +53,6 @@ Ns = 200             # number of samples we will use for MC MPC
 Nh = 25              # horizonline of MPC algorithm
 sqc_v = np.array([1,10.0,1e-5,1e-5],dtype=float)            # cost on state error
 sqc = np.diag(sqc_v)
-# src_v = np.array([1.0,1.0],dtype=float)
-# src = np.diag(src_v)            # cost on control action
 src = np.array([[0.001]])
 
 # simulation parameters
