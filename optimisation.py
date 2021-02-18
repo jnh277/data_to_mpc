@@ -197,6 +197,9 @@ def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_st
         # check that we have a valid search direction and if not then fix
         if nd >= -1e-8:
             [d, v] = np.linalg.eig(h)
+            if np.iscomplex(d).any():       # stop complex eigenvalues
+                d = np.real(d)
+                v = np.real(d)
             ind = d < 1e-6
             d[ind] = 1e-6 + np.abs(d[ind])
             hn = v @ np.diag(d) @ v.T
