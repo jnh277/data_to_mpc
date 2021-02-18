@@ -1,10 +1,8 @@
 """
-Simulate a first order state space model given by
-x_{t+1} = a*x_t + b*u_t + w_t
-y_t = x_t + e_t
-with q and r the standard deviations of w_t and q_t respectively
+Simulate a nonlinear rotarary inverted pendulum (QUBE SERVO2 SYSTEM)
+with independent process and measurement noise
 
-Jointly estimate the smoothed state trajectories and parameters theta = {a, b, q, r}
+Jointly estimate the smoothed state trajectories and parameters
 to give p(x_{1:T}, theta | y_{1:T})
 
 GOAL:
@@ -176,12 +174,6 @@ z_sim[2,:,0] = z3_0
 z_sim[3,:,0] = z4_0 
 
 # noise predrawn and independant
-# w_sim = np.zeros((Nx,1,T),dtype=float) # TODO: can do these 5 lines in one line
-# w_sim[0,:] = np.random.normal(0.0, q1_true, T)
-# w_sim[1,:] = np.random.normal(0.0, q2_true, T)
-# w_sim[2,:] = np.random.normal(0.0, q3_true, T)
-# w_sim[3,:] = np.random.normal(0.0, q4_true, T)
-
 w_sim = np.reshape(np.array([[0.],[q2_true],[q3_true],[q4_true]]),(4,1,1))*np.random.randn(4,1,T)
 
 
@@ -191,15 +183,9 @@ u = np.reshape(u, (Nu,T))
 
 # spicy
 for k in range(T):
-    # x1[k+1] = ssm1(x1[k],x2[k],u[k]) + w1[k]
-    # x2[k+1] = ssm2(x1[k],x2[k],u[k]) + w2[k]
     z_sim[:,:,[k+1]] = sim(z_sim[:,:,k],u[:,[k]],w_sim[:,:,[k]],theta_true)
-# z_sim[:,:,1:] = sim(z_sim[:,:,0],u,w_sim,theta_true)
+
 # simulate measurements
-# v = np.zeros((3,T), dtype=float) # TODO: This is a terrible way of doing this lol
-# v[0,:] = np.random.normal(0.0, r1_true, T)
-# v[1,:] = np.random.normal(0.0, r2_true, T)
-# v[2,:] = np.random.normal(0.0, r3_true, T)
 v = np.array([[r1_true],[r2_true],[r3_true]])*np.random.randn(3,T)
 y = np.zeros((3,T), dtype=float)
 y[0:2,:] = z_sim[0:2,0,:-1]
@@ -298,14 +284,6 @@ z = traces['h'][:,:,:no_obs]
 theta_mean = np.mean(theta,0)
 z_mean = np.mean(z,0)
 
-# LQ = traces['LQ']
-# LQ_mean = np.mean(LQ,0)
-# LR = traces['LR']
-# LR_mean = np.mean(LR,0)
-#
-# R = np.matmul(LR_mean, LR_mean.T)
-# Q = np.matmul(LQ_mean, LQ_mean.T)
-
 plot_trace(theta[:,0],3,1,'Jr')
 plot_trace(theta[:,1],3,2,'Jp')
 plot_trace(theta[:,2],3,3,'Km')
@@ -358,37 +336,6 @@ Dp_samps = theta[:,4].squeeze()
 Dr_samps = theta[:,5].squeeze()
 q_samps = np.transpose(traces['q'],(1,0))
 r_samps = np.transpose(traces['r'],(1,0))
-
-# # plot the initial parameter marginal estimates
-# q1plt = q_samps[0,:].squeeze()
-# q2plt = q_samps[1,:].squeeze()
-# q3plt = q_samps[2,:].squeeze()
-# r1plt = r_samps[0,:].squeeze()
-# r2plt = r_samps[1,:].squeeze()
-# q3plt = q_samps[2,:].squeeze()
-
-# plot_trace(m_samps,2,4,1,'m')
-# plt.title('HMC inferred parameters')
-# plot_trace(k_samps,2,4,2,'k')
-# plot_trace(b_samps,2,4,3,'b')
-# plot_trace(q1plt,2,4,4,'q1')
-# plot_trace(q2plt,2,4,5,'q2')
-# plot_trace(r1plt,2,4,6,'r1')
-# plot_trace(r2plt,2,4,7,'r2')
-# plt.show()
-#
-# # plot some of the initial marginal state estimates
-# for i in range(4):
-#     if i==1:
-#         plt.title('HMC inferred position')
-#     plt.subplot(2,2,i+1)
-#     plt.hist(z_samps[0,:,i*20+1],bins=30, label='p(x_'+str(i+1)+'|y_{1:T})', density=True)
-#     plt.axvline(z_sim[0,i*20+1], label='True', linestyle='--',color='k',linewidth=2)
-#     plt.xlabel('x_'+str(i+1))
-# plt.tight_layout()
-# plt.legend()
-# plt.show()
-
 #
 # downsample the the HMC output since for illustration purposes we sampled > M
 ind = np.random.choice(len(Jr_samps), Ns, replace=False)
@@ -426,45 +373,9 @@ ut = np.expand_dims(u[:,-1], axis=1)      # control action that was just applied
 # # ut which is the previously actioned control signal, and is [Nu,1]: 2D because of matmul
 # # m,k,b *_mpc are [Ns] arrays of parameter value samples: 1D because simplicity
 # # q,r *_mpc are [Nx/y,Ns]. Don't know why!
-#
+
 # # ----- Solve the MC MPC control problem ------------------#
-#
 # # jax compatible version of function to simulate forward the samples / scenarios
-# def simulate(xt, u, w, theta):
-#     a = theta['a']
-#     b = theta['b']
-#     [o, M, Np1] = w.shape
-#     x = jnp.zeros((o, M, Np1+1))
-#     # x[:, 0] = xt
-#     x = index_update(x, index[:, :,0], xt)
-#     for k in range(Np1):
-#         # x[:, k+1] = a * x[:, k] + b * u[k] + w[:, k]
-#         x = index_update(x, index[:, :, k+1], a * x[:, :, k] + b * u[:, k] + w[:, :, k])
-#     return x[:, :, 1:]
-#
-# def msd_simulate(xt, u, w, theta):
-#     m = theta['m']
-#     k = theta['k']
-#     b = theta['b']
-#     tau = theta['tau']
-#     [Nx, Ns, Np1] = w.shape
-#     x = jnp.zeros((Nx, Ns, Np1+1))
-#     # x[:, 0] = xt
-#     x = index_update(x, index[:, :, 0], xt)
-#     for ii in range(Np1):
-#         # x[:, k+1] = a * x[:, k] + b * u[k] + w[:, k]
-#         # xnext = jnp.vstack([tau*x[1, :, ii], x[1, : ii] + tau*(-k*(1/m)*x[0, :, ii] -b*(1/m)*x[1, :, ii] + (1/m)*u[:,ii])])
-#         # print(xnext.shape)
-#         # print(xnext)
-#         # x = index_update(x, index[:, :, ii + 1], xnext)
-#         x = index_update(x, index[0, :, ii+1], x[0,:,ii] + tau*x[1, :, ii] + w[0,:,ii])
-#         x = index_update(x, index[1, :, ii+1], x[1,:,ii] + tau*(-k*(1/m)*x[0, :, ii] -b*(1/m)*x[1, :, ii] + (1/m)*u[:,ii]) + w[1,:,ii])
-#
-#     return x[:, :, 1:]
-#
-# # x_{t+1},...,x_{t+N}, x_{t+N+1} that requires u to consist of u_t and uc [Nu,N]
-#
-#
 # compile cost and create gradient and hessian functions
 cost = jit(log_barrier_cost, static_argnums=(11,12,13, 14, 15))  # static argnums means it will recompile if N changes
 gradient = jit(grad(log_barrier_cost, argnums=0), static_argnums=(11, 12, 13, 14, 15))    # get compiled function to return gradients with respect to z (uc, s)
@@ -475,34 +386,18 @@ hessian = jit(jacfwd(jacrev(log_barrier_cost, argnums=0)), static_argnums=(11, 1
 mu = 1e4
 gamma = 1
 delta = 0.05
-# delta = np.linspace(0.05,0.2,N)     # varying the requried probabilistic satisfaction
-max_iter = 1000
+max_iter = 10000
 
 
 # define some state constraints, (these need to be tuples (so trailing comma))
-# z_ub = jnp.array([[100.],[0.75*math.pi],[100.],[100.]])
-# z_lb = jnp.array([[-100.],[-0.75*math.pi],[-100.],[-100.]])
-#
-# an array of size [o,M,N+1], z_ub is size [2,1]
-
 state_constraints = (lambda z: 0.75*np.pi - z[[0],:,:],lambda z: z[[0],:,:] + 0.75*np.pi)
 
-# state_constraints = (lambda z: np.pi - z[[0],:,:],lambda z: z[[0],:,:] + np.pi)
-
-# state_constraints = ()
+# define some input constraints
 input_constraints = (lambda u: 18. - u, lambda u: u + 18.)
-# input_constraints = ()
-#
-# theta = {'m':m_mpc,
-#          'k':k_mpc,
-#          'b':b_mpc,
-#          'tau': 1.0
-#          }
-#
-#
+
 # # solve mpc optimisation problem
 result = solve_chance_logbarrier(np.zeros((1,Nh)), cost, gradient, hessian, ut, zt, theta_mpc, w_mpc, z_star, sqc, src,
-                            delta, pend_simulate, state_constraints, input_constraints, verbose=2, max_iter=10000)
+                            delta, pend_simulate, state_constraints, input_constraints, verbose=2, max_iter=max_iter)
 
 uc = result['uc']
 #
