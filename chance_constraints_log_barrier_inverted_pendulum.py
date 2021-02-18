@@ -53,7 +53,7 @@ config.update("jax_enable_x64", True)           # run jax in 64 bit mode for acc
 # Control parameters
 z_star = np.array([[0],[np.pi],[0.0],[0.0]],dtype=float)        # desired set point in z1
 Ns = 200             # number of samples we will use for MC MPC
-Nh = 80              # horizonline of MPC algorithm
+Nh = 25              # horizonline of MPC algorithm
 sqc_v = np.array([1,10.0,1e-5,1e-5],dtype=float)            # cost on state error
 sqc = np.diag(sqc_v)
 # src_v = np.array([1.0,1.0],dtype=float)
@@ -62,8 +62,8 @@ src = np.array([[0.001]])
 
 # simulation parameters
 T = 100             # number of time steps to simulate and record measurements for
-Ts = 0.008
-z1_0 = np.pi/4            # initial states
+Ts = 0.025
+z1_0 = -np.pi/4            # initial states
 z2_0 = np.pi/4
 z3_0 = 0.0
 z4_0 = 0.0
@@ -482,12 +482,15 @@ max_iter = 1000
 
 
 # define some state constraints, (these need to be tuples (so trailing comma))
-z_ub = jnp.array([[100.],[0.75*math.pi],[100.],[100.]])
-z_lb = jnp.array([[-100.],[-0.75*math.pi],[-100.],[-100.]])
+# z_ub = jnp.array([[100.],[0.75*math.pi],[100.],[100.]])
+# z_lb = jnp.array([[-100.],[-0.75*math.pi],[-100.],[-100.]])
 #
 # an array of size [o,M,N+1], z_ub is size [2,1]
 
-state_constraints = (lambda z: 1000. - z,lambda z: z + 1000.)
+state_constraints = (lambda z: 0.75*np.pi - z[[0],:,:],lambda z: z[[0],:,:] + 0.75*np.pi)
+
+# state_constraints = (lambda z: np.pi - z[[0],:,:],lambda z: z[[0],:,:] + np.pi)
+
 # state_constraints = ()
 input_constraints = (lambda u: 18. - u, lambda u: u + 18.)
 # input_constraints = ()
@@ -518,12 +521,12 @@ if len(input_constraints) > 0:
 #
 for i in range(6):
     plt.subplot(2,3,i+1)
-    plt.hist(x_mpc[1,:, i*8], label='MC forward sim')
+    plt.hist(x_mpc[1,:, i*4], label='MC forward sim')
     if i==1:
         plt.title('MPC solution over horizon')
     # plt.axvline(x_star, linestyle='--', color='g', linewidth=2, label='target')
     # plt.axvline(x_ub, linestyle='--', color='r', linewidth=2, label='upper bound')
-    plt.xlabel('t+'+str(i*8+1))
+    plt.xlabel('t+'+str(i*4+1))
 plt.tight_layout()
 plt.legend()
 plt.show()
@@ -534,6 +537,9 @@ plt.show()
 
 
 plt.plot(x_mpc[1,:,:].mean(axis=0))
+plt.show()
+
+plt.plot(x_mpc[0,:,:].mean(axis=0))
 plt.show()
 #
 #
