@@ -55,10 +55,11 @@ input_constraints = (lambda u: 18. - u, lambda u: u + 18.)
 
 # simulation parameters
 # TODO: WARNING DONT MAKE T > 100 due to size of saved inv_metric
-T = 10             # number of time steps to simulate and record measurements for
+T = 30             # number of time steps to simulate and record measurements for
 Ts = 0.025
 z1_0 = -np.pi/4            # initial states
 z2_0 = np.pi/4
+# z2_0 = np.pi-0.1
 z3_0 = 0.0
 z4_0 = 0.0
 
@@ -173,6 +174,8 @@ theta_true = fill_theta(theta_true)
 # declare simulations variables
 z_sim = np.zeros((Nx, 1, T+1), dtype=float) # state history
 u = np.zeros((Nu, T+1), dtype=float)
+# for i in range(int(T/5)):
+#     u[0,i*5:] = np.random.uniform(-18,18,(1,))
 w_sim = np.reshape(np.array([[0.],[q2_true],[q3_true],[q4_true]]),(4,1,1))*np.random.randn(4,1,T)
 v = np.array([[r1_true],[r2_true],[r3_true]])*np.random.randn(3,T)
 y = np.zeros((Ny, T), dtype=float)
@@ -185,7 +188,7 @@ z_sim[3,:,0] = z4_0
 
 
 ### hmc parameters and set up the hmc model
-warmup = 0
+warmup = 300
 chains = 4
 iter = warmup + int(Ns/chains)
 model_name = 'pendulum_diag'
@@ -211,7 +214,7 @@ hessian = jit(jacfwd(jacrev(log_barrier_cost, argnums=0)), static_argnums=(11, 1
 mu = 1e4
 gamma = 1
 delta = 0.05
-max_iter = 10000
+max_iter = 5000
 
 # declare some variables for storing the ongoing resutls
 xt_est_save = np.zeros((Ns, Nx, T))
@@ -220,6 +223,7 @@ q_est_save = np.zeros((Ns, 4, T))
 r_est_save = np.zeros((Ns, 3, T))
 uc_save = np.zeros((1, Nh, T))
 mpc_result_save = []
+hmc_traces_save = []
 
 ### SIMULATE SYSTEM AND PERFORM MPC CONTROL
 for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control'):
@@ -249,8 +253,7 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
                 'q_p_std': np.array([q1_true, q2_true, 0.5*q3_true, 0.5*q3_true]),
                 }
 
-
-    this_init = list(last_pos)
+    inv_metric = pickle.load(open('stan_traces/inv_metric.pkl', 'rb'))
     this_inv_metric = inv_metric.copy()
     for cc in range(4):
         this_inv_metric[cc] = np.hstack((inv_metric[cc][0:t+2],
@@ -258,35 +261,47 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
                                          inv_metric[cc][202:202+t+2],
                                          inv_metric[cc][303:303+t+2],
                                          inv_metric[cc][-13:]))
-        if t == 0:
-            # this_init[cc]['h'] = np.array([[z1_0, z1_0], [z2_0, z2_0], [z3_0, z3_0], [z4_0, z4_0]])
-            this_init[cc]['h'] = np.hstack((np.array([[z1_0], [z2_0], [z3_0], [z4_0]]),
-                                            z_sim[:,0,[t+1]]))
-        else:
-            # this_init[cc]['h'] = np.hstack((this_init[cc]['h'], this_init[cc]['mu'][:,[-1]])) # does not work (diverges)
-            this_init[cc]['h'] = z_sim[:, 0, :t+2]     # TODO: dont use sim truth
-        del this_init[cc]['mu']
-        del this_init[cc]['yhat']
+    if t == 0:
+        z_init = np.hstack((np.array([[z1_0], [z2_0], [z3_0], [z4_0]]),
+                                        z_sim[:,0,[t+1]]))
+    else:
+        z_init = np.zeros((4, t + 2))
+        z_init[0, :-1] = y[0, :t+1]
+        z_init[1, :-1] = y[1, :t+1]
+        z_init[0, -1] = y[0, t]  # repeat last entry
+        z_init[1, -1] = y[1, t]  # repeat last entry
+        z_init[2, :-1] = np.gradient(y[0, :t+1]) / Ts
+        z_init[2, -1] = z_init[2, -2]
+        z_init[3, :-1] = np.gradient(y[1, :t+1]) / Ts
+        z_init[3, -1] = z_init[3, -2]
+    # z_init = z_sim[:,0,:t+2]
 
-    # with suppress_stdout_stderr():
-    # fit = model.sampling(data=stan_data, warmup=warmup, iter=iter, chains=chains,
-    #                      control=control,
-    #                      init=this_init)
+    # chain initialisation
+    def init_function(ind):
+        output = dict(theta=last_pos[ind]['theta'],
+                      h=z_init,
+                      q=last_pos[ind]['q'],
+                      r=last_pos[ind]['r']
+                      )
+        return output
+    init = [init_function(0),init_function(1),init_function(2),init_function(3)]
+
     control = {"adapt_delta": 0.85,
                "max_treedepth": 13,
                "stepsize": stepsize,
                "inv_metric": this_inv_metric,
-               "adapt_engaged": False}
+               "adapt_engaged": True}
     with suppress_stdout_stderr():
         fit = model.sampling(data=stan_data, warmup=warmup, iter=iter, chains=chains,
-                             control=control,
-                             init=this_init)
+                                 control=control,
+                                 init=init)
     traces = fit.extract()
-    last_pos = fit.get_last_position()
+    # hmc_traces_save.append(traces)
 
     theta = traces['theta']
     h = traces['h']
     z = h[:,:,:t+1]
+
     r_mpc = traces['r']
     q_mpc = traces['q']
 
@@ -334,10 +349,24 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
     r_est_save[:, :, t] = r_mpc
 
     # calculate next control action
+    # if t > 0:
+    #     # uc0 = np.hstack((uc[[0],1:],np.reshape(uc[0,-1],(1,1))))
+    #     uc0 = uc
+    #     # mu = result['mu'] * 2 ** 8
+    #     # gamma = result['gamma'] * 1.25 ** 8
+    #     # mu = 1e-6 * 2 ** 8
+    #     # mu = 1e-3 * 1.25 ** 8
+    #     mu = 200
+    #     gamma = 0.2
+    #     result = solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta_mpc, w_mpc, z_star, sqc,
+    #                                      src,
+    #                                      delta, pend_simulate, state_constraints, input_constraints, verbose=2,
+    #                                      max_iter=max_iter,mu=mu,gamma=gamma)
+    # else:
     result = solve_chance_logbarrier(np.zeros((1, Nh)), cost, gradient, hessian, ut, xt, theta_mpc, w_mpc, z_star, sqc,
-                                     src,
-                                     delta, pend_simulate, state_constraints, input_constraints, verbose=False,
-                                     max_iter=max_iter)
+                                         src,
+                                         delta, pend_simulate, state_constraints, input_constraints, verbose=False,
+                                         max_iter=max_iter)
     mpc_result_save.append(result)
 
     uc = result['uc']
@@ -345,58 +374,67 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
 
     uc_save[0, :, t] = uc[0,:]
 
+plt.plot(theta_est_save[:,0,18])
+plt.show()
 
-# plt.subplot(2,1,1)
-# plt.plot(x,label='True', color='k')
-# plt.plot(xt_est_save[0,:,:].mean(axis=0), color='b',label='mean')
-# plt.plot(np.percentile(xt_est_save[0,:,:],97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-# plt.plot(np.percentile(xt_est_save[0,:,:],2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-# plt.ylabel('x')
-# plt.axhline(x_ub,linestyle='--',color='r',linewidth=2.,label='constraint')
-# plt.axhline(x_star,linestyle='--',color='g',linewidth=2.,label='target')
-# plt.legend()
+plt.plot(u[0,:])
+plt.title('MPC determined control action')
+plt.show()
+
+plt.subplot(2, 1, 1)
+plt.plot(z_sim[0,0,:],label='True',color='k')
+plt.plot(xt_est_save[:,0,:].mean(axis=0), color='b',label='mean')
+plt.plot(np.percentile(xt_est_save[:,0,:],97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
+plt.plot(np.percentile(xt_est_save[:,0,:],2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
+plt.ylabel('arm angle')
+plt.legend()
+
+plt.subplot(2, 1, 2)
+plt.plot(z_sim[1,0,:],label='True',color='k')
+plt.plot(xt_est_save[:,1,:].mean(axis=0), color='b',label='mean')
+plt.plot(np.percentile(xt_est_save[:,1,:],97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
+plt.plot(np.percentile(xt_est_save[:,1,:],2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
+plt.ylabel('pendulum angle')
+plt.legend()
+
+plt.show()
+
+for t in range(T):
+    plt.plot(np.arange(Nh)+t,uc_save[0,:,t])
+plt.title('Control over horizon from each MPC solve')
+plt.show()
+
+if len(state_constraints) > 0:
+    x_mpc = sim(xt, np.hstack([ut, uc]), w_mpc, theta_mpc)
+    hx = np.concatenate([state_constraint(x_mpc[:, :, 1:]) for state_constraint in state_constraints], axis=2)
+    cx = np.mean(hx > 0, axis=1)
+    print('State constraint satisfaction')
+    print(cx)
+if len(input_constraints) > 0:
+    cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints],axis=1)
+    print('Input constraint satisfaction')
+    print(cu >= 0)
 #
-# plt.subplot(2,1,2)
-# plt.plot(u)
-# plt.axhline(u_ub,linestyle='--',color='r',linewidth=2.,label='constraint')
-# plt.ylabel('u')
-# plt.xlabel('t')
-#
-# plt.tight_layout()
-# plt.show()
-#
-# plt.subplot(2,2,1)
-# plt.plot(a_est_save.mean(axis=0),label='mean')
-# plt.plot(np.percentile(a_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-# plt.plot(np.percentile(a_est_save,2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-# plt.ylabel('a')
-# plt.axhline(0.9,linestyle='--',color='k',linewidth=2.,label='true')
-# plt.legend()
-#
-# plt.subplot(2,2,2)
-# plt.plot(b_est_save.mean(axis=0),label='mean')
-# plt.plot(np.percentile(b_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-# plt.plot(np.percentile(b_est_save,2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-# plt.ylabel('b')
-# plt.axhline(0.1,linestyle='--',color='k',linewidth=2.,label='true')
-# plt.legend()
-#
-# plt.subplot(2,2,3)
-# plt.plot(q_est_save.mean(axis=0),label='mean')
-# plt.plot(np.percentile(q_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-# plt.plot(np.percentile(q_est_save,2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-# plt.ylabel('q')
-# plt.axhline(q_true,linestyle='--',color='k',linewidth=2.,label='true')
-# plt.legend()
-# plt.xlabel('t')
-#
-# plt.subplot(2,2,4)
-# plt.plot(r_est_save.mean(axis=0),label='mean')
-# plt.plot(np.percentile(r_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-# plt.plot(np.percentile(r_est_save,2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-# plt.ylabel('r')
-# plt.axhline(r_true,linestyle='--',color='k',linewidth=2.,label='true')
-# plt.legend()
-# plt.xlabel('t')
-#
-# plt.show()
+for i in range(6):
+    plt.subplot(2,3,i+1)
+    plt.hist(x_mpc[1,:, i*4], label='MC forward sim')
+    if i==1:
+        plt.title('MPC solution over horizon')
+    # plt.axvline(x_star, linestyle='--', color='g', linewidth=2, label='target')
+    # plt.axvline(x_ub, linestyle='--', color='r', linewidth=2, label='upper bound')
+    plt.xlabel('t+'+str(i*4+1))
+plt.tight_layout()
+plt.legend()
+plt.show()
+
+
+
+plt.plot(x_mpc[0,:,:].mean(axis=0))
+plt.title('Predicted future arm angles')
+plt.show()
+
+plt.plot(x_mpc[1,:,:].mean(axis=0))
+plt.title('Predicted future pendulum angles')
+plt.show()
+
+
