@@ -146,10 +146,10 @@ def rk4(xt,ut,theta):
 
 def pend_simulate(xt,u,w,theta):# w is expected to be 3D. xt is expected to be 2D. ut is expected to be 2d but also, should handle being a vector (3d)
     [Nx,Ns,Np1] = w.shape
-    if u.ndim == 2:
-        Nu = u.shape[1]
-        if Nu != Np1:
-            print('wyd??')
+    # if u.ndim == 2:  # conditional checks might slow jax down
+    #     Nu = u.shape[1]
+        # if Nu != Np1:
+        #     print('wyd??')
     x = jnp.zeros((Nx, Ns, Np1+1))
     x = index_update(x, index[:, :, 0], xt)
     for ii in range(Np1):
@@ -205,7 +205,7 @@ plt.show()
 trace_name = 'inverted_pendulum_trace'
 trace_path = 'stan_traces/'
 init_name = 'inverted_pendulum_init'
-dont_stan = True
+dont_stan = False
 
 
 if Path(trace_path+trace_name+'.pkl').is_file() & Path(trace_path+init_name+'.pkl').is_file() & dont_stan:
@@ -267,13 +267,23 @@ else:
         return output
 
 
-    fit = model.sampling(data=stan_data, warmup=1000, iter=1200, chains=4,control=control, init=init_function)
+    fit = model.sampling(data=stan_data, warmup=2000, iter=2200, chains=4,control=control, init=init_function)
 
     traces = fit.extract()
     with open(trace_path+trace_name+'.pkl', 'wb') as file:
         pickle.dump(traces, file)
     with open(trace_path+init_name+'.pkl','wb') as file:
         pickle.dump(z_init,file)
+
+    # stepsize = fit.get_stepsize()
+    # inv_metric = fit.get_inv_metric(as_dict=True)
+    # last_pos = fit.get_last_position()
+    # with open('stan_traces/step_size.pkl','wb') as file:
+    #     pickle.dump(stepsize,file)
+    # with open('stan_traces/inv_metric.pkl', 'wb') as file:
+    #     pickle.dump(inv_metric, file)
+    # with open('stan_traces/last_pos.pkl', 'wb') as file:
+    #     pickle.dump(last_pos, file)
     
 
 theta = traces['theta']
