@@ -42,7 +42,7 @@ config.update("jax_enable_x64", True)           # run jax in 64 bit mode for acc
 # Control parameters
 z_star = np.array([[0],[np.pi],[0.0],[0.0]],dtype=float)        # desired set point in z1
 Ns = 200             # number of samples we will use for MC MPC
-Nh = 30              # horizonline of MPC algorithm
+Nh = 25              # horizonline of MPC algorithm
 sqc_v = np.array([1,10.0,1e-5,1e-5],dtype=float)            # cost on state error
 sqc = np.diag(sqc_v)
 src = np.array([[0.001]])
@@ -55,7 +55,7 @@ input_constraints = (lambda u: 18. - u, lambda u: u + 18.)
 
 # simulation parameters
 # TODO: WARNING DONT MAKE T > 100 due to size of saved inv_metric
-T = 2             # number of time steps to simulate and record measurements for
+T = 10             # number of time steps to simulate and record measurements for
 Ts = 0.025
 z1_0 = -np.pi/4            # initial states
 z2_0 = np.pi/4
@@ -172,7 +172,7 @@ theta_true = fill_theta(theta_true)
 
 # declare simulations variables
 z_sim = np.zeros((Nx, 1, T+1), dtype=float) # state history
-u = np.zeros((Nu, T), dtype=float)
+u = np.zeros((Nu, T+1), dtype=float)
 w_sim = np.reshape(np.array([[0.],[q2_true],[q3_true],[q4_true]]),(4,1,1))*np.random.randn(4,1,T)
 v = np.array([[r1_true],[r2_true],[r3_true]])*np.random.randn(3,T)
 y = np.zeros((Ny, T), dtype=float)
@@ -218,6 +218,7 @@ xt_est_save = np.zeros((Ns, Nx, T))
 theta_est_save = np.zeros((Ns, 6, T))
 q_est_save = np.zeros((Ns, 4, T))
 r_est_save = np.zeros((Ns, 3, T))
+uc_save = np.zeros((1, Nh, T))
 
 ### SIMULATE SYSTEM AND PERFORM MPC CONTROL
 for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control'):
@@ -261,7 +262,8 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
             this_init[cc]['h'] = np.hstack((np.array([[z1_0], [z2_0], [z3_0], [z4_0]]),
                                             z_sim[:,0,[t+1]]))
         else:
-            this_init[cc]['h'] = np.hstack((this_init[cc]['h'], this_init[cc]['mu'][:,[-1]]))
+            # this_init[cc]['h'] = np.hstack((this_init[cc]['h'], this_init[cc]['mu'][:,[-1]])) # does not work (diverges)
+            this_init[cc]['h'] = z_sim[:, 0, :]     # TODO: dont use sim truth
         del this_init[cc]['mu']
         del this_init[cc]['yhat']
 
@@ -279,7 +281,7 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
                              control=control,
                              init=this_init)
     traces = fit.extract()
-
+    last_pos = fit.get_last_position()
 
     theta = traces['theta']
     h = traces['h']
@@ -332,11 +334,13 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
     # calculate next control action
     result = solve_chance_logbarrier(np.zeros((1, Nh)), cost, gradient, hessian, ut, xt, theta_mpc, w_mpc, z_star, sqc,
                                      src,
-                                     delta, pend_simulate, state_constraints, input_constraints, verbose=2,
+                                     delta, pend_simulate, state_constraints, input_constraints, verbose=False,
                                      max_iter=max_iter)
 
     uc = result['uc']
     u[:,t+1] = uc[0,0]
+
+    uc_save[0, :, t] = uc[0,:]
 
 
 # plt.subplot(2,1,1)
