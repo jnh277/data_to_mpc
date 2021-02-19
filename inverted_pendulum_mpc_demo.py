@@ -219,6 +219,7 @@ theta_est_save = np.zeros((Ns, 6, T))
 q_est_save = np.zeros((Ns, 4, T))
 r_est_save = np.zeros((Ns, 3, T))
 uc_save = np.zeros((1, Nh, T))
+mpc_result_save = []
 
 ### SIMULATE SYSTEM AND PERFORM MPC CONTROL
 for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control'):
@@ -263,7 +264,7 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
                                             z_sim[:,0,[t+1]]))
         else:
             # this_init[cc]['h'] = np.hstack((this_init[cc]['h'], this_init[cc]['mu'][:,[-1]])) # does not work (diverges)
-            this_init[cc]['h'] = z_sim[:, 0, :]     # TODO: dont use sim truth
+            this_init[cc]['h'] = z_sim[:, 0, :t+2]     # TODO: dont use sim truth
         del this_init[cc]['mu']
         del this_init[cc]['yhat']
 
@@ -312,9 +313,10 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
     }
     theta_mpc = fill_theta(theta_mpc)
 
-    # current state samples (expanded to [o,M]
+    # current state samples (reshaped to [o,M])
     xt = z[:,:,-1].T
     # we also need to sample noise
+    # TODO: Only update one step of the noise and reuse previous
     w_mpc = np.zeros((Nx, Ns, Nh + 1), dtype=float)
     w_mpc[0, :, :] = np.expand_dims(col_vec(q_mpc[:, 0]) * np.random.randn(Ns, Nh + 1),
                                     0)  # uses the sampled stds, need to sample for x_t to x_{t+N+1}
@@ -336,6 +338,7 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
                                      src,
                                      delta, pend_simulate, state_constraints, input_constraints, verbose=False,
                                      max_iter=max_iter)
+    mpc_result_save.append(result)
 
     uc = result['uc']
     u[:,t+1] = uc[0,0]

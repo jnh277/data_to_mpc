@@ -131,3 +131,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 *.pkl
+
+
+# unignore a few files
+!stan_traces/inv_metric.pkl
+!stan_traces/step_size.pkl
+!stan_traces/last_pos.pkl
