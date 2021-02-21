@@ -34,7 +34,7 @@ from jax.ops import index, index_add, index_update
 from jax.config import config
 
 # optimisation module imports (needs to be done before the jax confix update)
-from optimisation import log_barrier_cost, solve_chance_logbarrier
+from optimisation import log_barrier_cost, solve_chance_logbarrier, log_barrier_cosine_cost
 
 config.update("jax_enable_x64", True)           # run jax in 64 bit mode for accuracy
 
@@ -43,17 +43,20 @@ config.update("jax_enable_x64", True)           # run jax in 64 bit mode for acc
 z_star = np.array([[0],[np.pi],[0.0],[0.0]],dtype=float)        # desired set point in z1
 Ns = 200             # number of samples we will use for MC MPC
 Nh = 25              # horizonline of MPC algorithm
-sqc_v = np.array([1,10.0,1e-5,1e-5],dtype=float)            # cost on state error
+# sqc_v = np.array([1,10.0,1e-5,1e-5],dtype=float)            # cost on state error
+sqc_v = np.array([1,30.,1e-5,1e-5],dtype=float)
 sqc = np.diag(sqc_v)
 src = np.array([[0.001]])
 
 # define the state constraints, (these need to be tuples)
+state_bound = 1.0*np.pi
+input_bound = 18.0
 # state_constraints = (lambda z: 0.75*np.pi - z[[0],:,:],lambda z: z[[0],:,:] + 0.75*np.pi)
 # # define the input constraints
 # input_constraints = (lambda u: 18. - u, lambda u: u + 18.)
-state_constraints = (lambda z: 1*np.pi - z[[0],:,:],lambda z: z[[0],:,:] + 1*np.pi)
+state_constraints = (lambda z: state_bound - z[[0],:,:],lambda z: z[[0],:,:] + state_bound)
 # define the input constraints
-input_constraints = (lambda u: 18. - u, lambda u: u + 18.)
+input_constraints = (lambda u: input_bound - u, lambda u: u + input_bound)
 
 # run1: worked with 100, 2pi, and Nh=20, T=30
 # run2: worked with 80, pi, and Nh=25, T=50
@@ -70,8 +73,8 @@ Ts = 0.025
 # z1_0 = 0.7*np.pi            # initial states
 # z1_0 = -0.7*np.pi            # initial states
 z1_0 = np.pi - 0.05
-z2_0 = -np.pi/3
-# z2_0 = 0.0
+# z2_0 = -np.pi/3
+z2_0 = 0.001
 # z2_0 = np.pi-0.1
 z3_0 = 0.0
 z4_0 = 0.0
@@ -220,9 +223,13 @@ last_pos = pickle.load(open('stan_traces/last_pos.pkl','rb'))
 
 
 # define MPC cost, gradient and hessian function
-cost = jit(log_barrier_cost, static_argnums=(11,12,13, 14, 15))  # static argnums means it will recompile if N changes
-gradient = jit(grad(log_barrier_cost, argnums=0), static_argnums=(11, 12, 13, 14, 15))    # get compiled function to return gradients with respect to z (uc, s)
-hessian = jit(jacfwd(jacrev(log_barrier_cost, argnums=0)), static_argnums=(11, 12, 13, 14, 15))
+cost = jit(log_barrier_cosine_cost, static_argnums=(11,12,13, 14, 15))  # static argnums means it will recompile if N changes
+gradient = jit(grad(log_barrier_cosine_cost, argnums=0), static_argnums=(11, 12, 13, 14, 15))    # get compiled function to return gradients with respect to z (uc, s)
+hessian = jit(jacfwd(jacrev(log_barrier_cosine_cost, argnums=0)), static_argnums=(11, 12, 13, 14, 15))
+
+# cost = jit(log_barrier_cost, static_argnums=(11,12,13, 14, 15))  # static argnums means it will recompile if N changes
+# gradient = jit(grad(log_barrier_cost, argnums=0), static_argnums=(11, 12, 13, 14, 15))    # get compiled function to return gradients with respect to z (uc, s)
+# hessian = jit(jacfwd(jacrev(log_barrier_cost, argnums=0)), static_argnums=(11, 12, 13, 14, 15))
 
 mu = 1e4
 gamma = 1
@@ -421,6 +428,7 @@ plt.plot(z_sim[0,0,:],label='True',color='k')
 plt.plot(xt_est_save[:,0,:].mean(axis=0), color='b',label='mean')
 plt.plot(np.percentile(xt_est_save[:,0,:],97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
 plt.plot(np.percentile(xt_est_save[:,0,:],2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
+plt.axvline(state_bound, linestyle='--', color='r', linewidth=2, label='constraint')
 plt.ylabel('arm angle')
 plt.legend()
 
@@ -455,8 +463,7 @@ for i in range(6):
     plt.hist(x_mpc[1,:, i*4], label='MC forward sim')
     if i==1:
         plt.title('MPC solution over horizon')
-    # plt.axvline(x_star, linestyle='--', color='g', linewidth=2, label='target')
-    # plt.axvline(x_ub, linestyle='--', color='r', linewidth=2, label='upper bound')
+    plt.axvline(z_star[1,0], linestyle='--', color='g', linewidth=2, label='target')
     plt.xlabel('t+'+str(i*4+1))
 plt.tight_layout()
 plt.legend()
