@@ -48,17 +48,30 @@ sqc = np.diag(sqc_v)
 src = np.array([[0.001]])
 
 # define the state constraints, (these need to be tuples)
-state_constraints = (lambda z: 0.75*np.pi - z[[0],:,:],lambda z: z[[0],:,:] + 0.75*np.pi)
+# state_constraints = (lambda z: 0.75*np.pi - z[[0],:,:],lambda z: z[[0],:,:] + 0.75*np.pi)
+# # define the input constraints
+# input_constraints = (lambda u: 18. - u, lambda u: u + 18.)
+state_constraints = (lambda z: 1*np.pi - z[[0],:,:],lambda z: z[[0],:,:] + 1*np.pi)
 # define the input constraints
 input_constraints = (lambda u: 18. - u, lambda u: u + 18.)
 
+# run1: worked with 100, 2pi, and Nh=20, T=30
+# run2: worked with 80, pi, and Nh=25, T=50
+# run3: briefly stabilised with 60, pi, and NH=25, T=50
+# run4: stabilised with 100, 1.5*pi, and Nh = 25, T=50
+# run5: start fully down, same as above, stabilised
+# run6: stabilised +/-18, no constraints on arm angle, Nh=25, T=50
+# run7: stabilised +/-18 input, +/- pi on arm angle, Nh=25, T=50
 
 # simulation parameters
 # TODO: WARNING DONT MAKE T > 100 due to size of saved inv_metric
-T = 30             # number of time steps to simulate and record measurements for
+T = 50             # number of time steps to simulate and record measurements for
 Ts = 0.025
-z1_0 = -np.pi/4            # initial states
-z2_0 = np.pi/4
+# z1_0 = 0.7*np.pi            # initial states
+# z1_0 = -0.7*np.pi            # initial states
+z1_0 = np.pi - 0.05
+z2_0 = -np.pi/3
+# z2_0 = 0.0
 # z2_0 = np.pi-0.1
 z3_0 = 0.0
 z4_0 = 0.0
@@ -225,6 +238,24 @@ uc_save = np.zeros((1, Nh, T))
 mpc_result_save = []
 hmc_traces_save = []
 
+# run = 'run8'
+# with open('results/'+run+'/xt_est_save100.pkl','wb') as file:
+#     pickle.dump(xt_est_save, file)
+# with open('results/'+run+'/theta_est_save100.pkl','wb') as file:
+#     pickle.dump(theta_est_save, file)
+# with open('results/'+run+'/q_est_save100.pkl','wb') as file:
+#     pickle.dump(q_est_save, file)
+# with open('results/'+run+'/r_est_save100.pkl','wb') as file:
+#     pickle.dump(r_est_save, file)
+# with open('results/'+run+'/z_sim100.pkl','wb') as file:
+#     pickle.dump(z_sim, file)
+# with open('results/'+run+'/u100.pkl','wb') as file:
+#     pickle.dump(u, file)
+# with open('results/'+run+'/mpc_result_save100.pkl', 'wb') as file:
+#     pickle.dump(mpc_result_save, file)
+# with open('results/'+run+'/uc_save100.pkl', 'wb') as file:
+#     pickle.dump(uc_save, file)
+
 ### SIMULATE SYSTEM AND PERFORM MPC CONTROL
 for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control'):
     # simulate system
@@ -296,7 +327,7 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
                                  control=control,
                                  init=init)
     traces = fit.extract()
-    # hmc_traces_save.append(traces)
+    hmc_traces_save.append(traces)
 
     theta = traces['theta']
     h = traces['h']
@@ -304,6 +335,9 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
 
     r_mpc = traces['r']
     q_mpc = traces['q']
+
+    # TODO: use the standard deviation of the chains to check if they ran well
+    # TODO: check that excluding a chain wont cause a recompile
 
     # parameter samples
     Jr_samps = theta[:, 0].squeeze()
@@ -328,10 +362,11 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
     }
     theta_mpc = fill_theta(theta_mpc)
 
+
+
     # current state samples (reshaped to [o,M])
     xt = z[:,:,-1].T
     # we also need to sample noise
-    # TODO: Only update one step of the noise and reuse previous
     w_mpc = np.zeros((Nx, Ns, Nh + 1), dtype=float)
     w_mpc[0, :, :] = np.expand_dims(col_vec(q_mpc[:, 0]) * np.random.randn(Ns, Nh + 1),
                                     0)  # uses the sampled stds, need to sample for x_t to x_{t+N+1}
@@ -349,21 +384,21 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
     r_est_save[:, :, t] = r_mpc
 
     # calculate next control action
-    # if t > 0:
-    #     # uc0 = np.hstack((uc[[0],1:],np.reshape(uc[0,-1],(1,1))))
-    #     uc0 = uc
-    #     # mu = result['mu'] * 2 ** 8
-    #     # gamma = result['gamma'] * 1.25 ** 8
-    #     # mu = 1e-6 * 2 ** 8
-    #     # mu = 1e-3 * 1.25 ** 8
-    #     mu = 200
-    #     gamma = 0.2
-    #     result = solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta_mpc, w_mpc, z_star, sqc,
-    #                                      src,
-    #                                      delta, pend_simulate, state_constraints, input_constraints, verbose=2,
-    #                                      max_iter=max_iter,mu=mu,gamma=gamma)
-    # else:
-    result = solve_chance_logbarrier(np.zeros((1, Nh)), cost, gradient, hessian, ut, xt, theta_mpc, w_mpc, z_star, sqc,
+    if t > 0:
+        uc0 = np.hstack((uc[[0],1:],np.reshape(uc[0,-1],(1,1))))
+        # uc0 = uc
+        # mu = result['mu'] * 2 ** 8
+        # gamma = result['gamma'] * 1.25 ** 8
+        # mu = 1e-6 * 2 ** 8
+        # mu = 1e-3 * 1.25 ** 8
+        mu = 200
+        gamma = 0.2
+        result = solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta_mpc, w_mpc, z_star, sqc,
+                                         src,
+                                         delta, pend_simulate, state_constraints, input_constraints, verbose=False,
+                                         max_iter=max_iter,mu=mu,gamma=gamma)
+    else:
+        result = solve_chance_logbarrier(np.zeros((1, Nh)), cost, gradient, hessian, ut, xt, theta_mpc, w_mpc, z_star, sqc,
                                          src,
                                          delta, pend_simulate, state_constraints, input_constraints, verbose=False,
                                          max_iter=max_iter)
@@ -374,7 +409,7 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
 
     uc_save[0, :, t] = uc[0,:]
 
-plt.plot(theta_est_save[:,0,18])
+plt.plot(theta_est_save[:,0,11])
 plt.show()
 
 plt.plot(u[0,:])
