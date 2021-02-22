@@ -67,17 +67,17 @@ input_constraints = (lambda u: input_bound - u, lambda u: u + input_bound)
 # run7: stabilised +/-18 input, +/- pi on arm angle, Nh=25, T=50
 # run8: static hange start: +/-18 input, +/- pi on angle, NH=25. T=50. Stabilised
 # run9: as above but with +/- 0.75pi on angle, stabilised, start z1_0 at close to 0.75 pi
-
+# run10: proper static swing up, starting all around 0, proper constraints
 
 # simulation parameters
 # TODO: WARNING DONT MAKE T > 100 due to size of saved inv_metric
-T = 50             # number of time steps to simulate and record measurements for
+T = 70             # number of time steps to simulate and record measurements for
 Ts = 0.025
 # z1_0 = 0.7*np.pi            # initial states
 # z1_0 = -0.7*np.pi            # initial states
 # z1_0 = np.pi - 0.05
-# z1_0 = 0.0
-z1_0 = 0.75*np.pi - 0.1
+z1_0 = 0.0
+# z1_0 = 0.75*np.pi - 0.1
 # z2_0 = -np.pi/3
 z2_0 = 0.001
 # z2_0 = np.pi-0.1
