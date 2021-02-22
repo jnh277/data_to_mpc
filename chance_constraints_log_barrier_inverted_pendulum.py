@@ -176,7 +176,7 @@ w_sim = np.reshape(np.array([[0.],[q2_true],[q3_true],[q4_true]]),(4,1,1))*np.ra
 
 
 # create some inputs that are random but held for 10 time steps
-u = np.zeros((Nu, T+1), dtype=float)
+u = np.zeros((Nu, T), dtype=float)
 for i in range(int(T/10)):
     u[0,i*10:] = np.random.uniform(-18,18,(1,))
 

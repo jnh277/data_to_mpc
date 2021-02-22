@@ -4,6 +4,7 @@ import jax.numpy as jnp
 from jax import grad, jit, device_put, jacfwd, jacrev
 from jax.ops import index, index_add, index_update
 from jax.config import config
+config.update("jax_enable_x64", True)
 
 def fill_theta(t):
     Jr = t['Jr']

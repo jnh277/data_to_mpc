@@ -50,8 +50,8 @@ config.update("jax_enable_x64", True)           # run jax in 64 bit mode for acc
 
 # Control parameters
 z_star = np.array([[0],[np.pi],[0.0],[0.0]],dtype=float)        # desired set point in z1
-Ns = 2             # number of samples we will use for MC MPC
-Nh = 25              # horizonline of MPC algorithm
+Ns = 1             # number of samples we will use for MC MPC
+Nh = 20              # horizonline of MPC algorithm
 sqc_v = np.array([1,10.0,1e-5,1e-5],dtype=float)            # cost on state error
 sqc = np.diag(sqc_v)
 src = np.array([[0.001]])
@@ -59,8 +59,8 @@ src = np.array([[0.001]])
 # simulation parameters
 T = 100             # number of time steps to simulate and record measurements for
 Ts = 0.025
-z1_0 = -np.pi/4            # initial states
-z2_0 = np.pi/4
+z1_0 = 0.0            # initial states
+z2_0 = 0.0
 z3_0 = 0.0
 z4_0 = 0.0
 
@@ -367,8 +367,9 @@ theta_mpc = fill_theta(theta_mpc)
 
 q_mpc = q_mean
 r_mpc = r_mean
-zt = z_samps[:,0,-1]  # inferred state for current time step
+zt = z_samps[:,0,[-1]]  # inferred state for current time step
 #
+print(zt.shape)
 # predraw noise from sampled q! --> Ns number of Nh long scenarios assocation with a particular q
 w_mpc = np.zeros((Nx,1,Nh+1),dtype=float)
 # w_mpc[0,:,:] = np.expand_dims(col_vec(q_mpc[0,:]) * np.random.randn(Ns, Nh+1), 0)  # uses the sampled stds, need to sample for x_t to x_{t+N+1}
@@ -378,6 +379,9 @@ w_mpc = np.zeros((Nx,1,Nh+1),dtype=float)
 # ut = u[:,-1]
 ut = np.expand_dims(u[:,-1], axis=1)      # control action that was just applied
 
+xt_bar = jnp.array([[0.0],[np.pi],[0.0],[0.0]]).flatten()
+ut_bar = jnp.array([[0.0]]).flatten()
+theta_mpc['P'] = dare_P(sqc,src,xt_bar,ut_bar,theta_mpc)
 #
 # # At this point I have:
 # # zt which is the current inferred state, and is [Nx,Ns]: Ns samples of Nx column vector
