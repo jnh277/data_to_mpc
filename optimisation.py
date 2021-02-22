@@ -3,6 +3,7 @@ import numpy as np
 import jax.numpy as jnp
 from jax import grad, jit, device_put, jacfwd, jacrev
 from jax.scipy.special import expit
+from dare import dare_P
 
 from helpers import row_vec
 
@@ -93,8 +94,11 @@ def log_barrier_cost(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, gamma, si
     else:
         cu = 1.0        # ln(cu,mu) = 0
     V3 = logbarrier(cx, mu) + logbarrier(cu, mu)
-    V4 = terminal_cost(x[:,:,:-1])
-    return V1 + V2 + V3
+    xt_bar = jnp.array([[0],[np.pi],[0.0],[0.0]]).flatten()
+    ut_bar = jnp.array([[0]]).flatten()
+    P = dare_P(sqc,src,xt_bar,ut_bar,theta)
+    V4 = x[:,-1] @ P @ x[:,-1].T
+    return V1 + V2 + V3 + V4
 
 def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_star, sqc, src, delta, simulate,
                             state_constraints, input_constraints, verbose=True, max_iter=1000, gamma=1.0, mu=1e4,

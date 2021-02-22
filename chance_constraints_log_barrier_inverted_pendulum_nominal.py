@@ -40,6 +40,7 @@ from jax.config import config
 
 # optimisation module imports (needs to be done before the jax confix update)
 from optimisation import log_barrier_cost, solve_chance_logbarrier
+from dare import dare_P
 
 config.update("jax_enable_x64", True)           # run jax in 64 bit mode for accuracy
 
@@ -49,7 +50,7 @@ config.update("jax_enable_x64", True)           # run jax in 64 bit mode for acc
 
 # Control parameters
 z_star = np.array([[0],[np.pi],[0.0],[0.0]],dtype=float)        # desired set point in z1
-Ns = 1             # number of samples we will use for MC MPC
+Ns = 2             # number of samples we will use for MC MPC
 Nh = 25              # horizonline of MPC algorithm
 sqc_v = np.array([1,10.0,1e-5,1e-5],dtype=float)            # cost on state error
 sqc = np.diag(sqc_v)
@@ -146,7 +147,7 @@ def rk4(xt,ut,theta):
 
 def pend_simulate(xt,u,w,theta):# w is expected to be 3D. xt is expected to be 2D. ut is expected to be 2d but also, should handle being a vector (3d)
     [Nx,Ns,Np1] = w.shape
-    # if u.ndim == 2:  # conditional checks might slow jax down
+    # if u.ndim == 2:  # conditional checks do slow jax down
     #     Nu = u.shape[1]
         # if Nu != Np1:
         #     print('wyd??')
@@ -376,14 +377,6 @@ w_mpc = np.zeros((Nx,1,Nh+1),dtype=float)
 # w_mpc[3,:,:] = np.expand_dims(col_vec(q_mpc[3,:]) * np.random.randn(Ns, Nh+1), 0)
 # ut = u[:,-1]
 ut = np.expand_dims(u[:,-1], axis=1)      # control action that was just applied
-
-xt_bar = np.array([[0],[np.pi],[0.0],[0.0]],dtype=float)
-ut_bar = np.array([[0]],dtype=float)
-
-xiso = lambda xt: rk4(xt,ut_bar,theta_mpc)
-uiso = lambda ut: rk4(xt_bar,ut,theta_mpc)
-A = jacfwd(xiso)(xt_bar)
-B = jacfwd(uiso)(ut_bar)
 
 #
 # # At this point I have:
