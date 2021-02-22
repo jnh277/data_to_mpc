@@ -93,6 +93,7 @@ def log_barrier_cost(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, gamma, si
     else:
         cu = 1.0        # ln(cu,mu) = 0
     V3 = logbarrier(cx, mu) + logbarrier(cu, mu)
+    V4 = terminal_cost(x[:,:,:-1])
     return V1 + V2 + V3
 
 def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_star, sqc, src, delta, simulate,
@@ -413,3 +414,32 @@ def solve_chance_logbarrier2(uc0, cost, gradient, hessian, ut, xt, theta, w, x_s
               'hessian':h,
               'newton_decrement':np.dot(g,p)}
     return result
+
+
+
+def solve_dare(Q,R,A0,B): # http://dx.doi.org/10.1080/00207170410001714988
+    eps = 10 ** -5
+    Nx = A.shape[0]
+    Nu = B.shape[1]
+    H = Q
+    A = A0
+    Rinv = np.linalg.inv(R)
+    G = B @ Rinv @ B.T
+    I = np.identity(Nx)
+    while True:
+        S = I - G @ H
+        S = np.linalg.inv(S)
+        Ap = A @ S @ A
+        Gp = G + A @ S @ G @ A.T
+        Hp = H + A.T @ H @ S @ A
+        top = Hp - H
+        rat = np.linalg.det(top)/np.linalg.det(Hp)
+        if rat <= eps:
+            break
+    return Hp
+
+
+
+if __name__ == "__main__":
+
+
