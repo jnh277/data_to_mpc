@@ -49,7 +49,7 @@ config.update("jax_enable_x64", True)           # run jax in 64 bit mode for acc
 
 # Control parameters
 z_star = np.array([[0],[np.pi],[0.0],[0.0]],dtype=float)        # desired set point in z1
-Ns = 200             # number of samples we will use for MC MPC
+Ns = 1             # number of samples we will use for MC MPC
 Nh = 25              # horizonline of MPC algorithm
 sqc_v = np.array([1,10.0,1e-5,1e-5],dtype=float)            # cost on state error
 sqc = np.diag(sqc_v)
@@ -156,6 +156,7 @@ def pend_simulate(xt,u,w,theta):# w is expected to be 3D. xt is expected to be 2
         x = index_update(x, index[:, :, ii+1], rk4(x[:,:,ii],u[:,ii],theta) + w[:, :, ii]) # slicing creates 2d x into 3d x. Also, Np1 loop will consume all of w
     return x[:, :, 1:]  # return everything except xt 
 
+
 # compile cost and create gradient and hessian functions
 sim = jit(pend_simulate)  # static argnums means it will recompile if N changes
 
@@ -175,7 +176,7 @@ w_sim = np.reshape(np.array([[0.],[q2_true],[q3_true],[q4_true]]),(4,1,1))*np.ra
 
 
 # create some inputs that are random but held for 10 time steps
-u = np.zeros((Nu, T+1), dtype=float)
+u = np.zeros((Nu, T), dtype=float)
 for i in range(int(T/10)):
     u[0,i*10:] = np.random.uniform(-18,18,(1,))
 
@@ -206,7 +207,7 @@ plt.show()
 trace_name = 'inverted_pendulum_trace'
 trace_path = 'stan_traces/'
 init_name = 'inverted_pendulum_init'
-dont_stan = False
+dont_stan = True
 
 
 if Path(trace_path+trace_name+'.pkl').is_file() & Path(trace_path+init_name+'.pkl').is_file() & dont_stan:
@@ -336,35 +337,35 @@ plt.show()
 z_samps = np.transpose(z,(1,0,2)) # Ns, Nx, T --> Nx, Ns, T
 
 # parameter samples
-Jr_samps = theta[:,0].mean()
-Jp_samps = theta[:,1].mean()
-Km_samps = theta[:,2].mean()
-Rm_samps = theta[:,3].mean()
-Dp_samps = theta[:,4].mean()
-Dr_samps = theta[:,5].mean()
-q_samps = np.transpose(traces['q'],(1,0)).mean()
-r_samps = np.transpose(traces['r'],(1,0)).mean()
+Jr_mean = theta[:,0].mean()
+Jp_mean = theta[:,1].mean()
+Km_mean = theta[:,2].mean()
+Rm_mean = theta[:,3].mean()
+Dp_mean = theta[:,4].mean()
+Dr_mean = theta[:,5].mean()
+q_mean = np.transpose(traces['q'],(1,0)).mean()
+r_mean = np.transpose(traces['r'],(1,0)).mean()
 #
 # downsample the the HMC output since for illustration purposes we sampled > M
-ind = np.random.choice(len(Jr_samps), 1, replace=False)
+# ind = np.random.choice(len(Jr_samps), 1, replace=False)
 theta_mpc = {
         'Mp': mp_true,
         'Lp': Lp_true,
         'Lr': Lr_true,
-        'Jr': Jr_samps[0],
-        'Jp': Jp_samps[0],
-        'Km': Km_samps[0],
-        'Rm': Rm_samps[0],
-        'Dp': Dp_samps[0],
-        'Dr': Dr_samps[0],
+        'Jr': Jr_mean,
+        'Jp': Jp_mean,
+        'Km': Km_mean,
+        'Rm': Rm_mean,
+        'Dp': Dp_mean,
+        'Dr': Dr_mean,
         'g': grav,
         'h': Ts
 }
 
 theta_mpc = fill_theta(theta_mpc)
 
-q_mpc = q_samps[:,0]
-r_mpc = r_samps[:,0]
+q_mpc = q_mean
+r_mpc = r_mean
 zt = z_samps[:,0,-1]  # inferred state for current time step
 #
 # predraw noise from sampled q! --> Ns number of Nh long scenarios assocation with a particular q
@@ -375,6 +376,15 @@ w_mpc = np.zeros((Nx,1,Nh+1),dtype=float)
 # w_mpc[3,:,:] = np.expand_dims(col_vec(q_mpc[3,:]) * np.random.randn(Ns, Nh+1), 0)
 # ut = u[:,-1]
 ut = np.expand_dims(u[:,-1], axis=1)      # control action that was just applied
+
+xt_bar = np.array([[0],[np.pi],[0.0],[0.0]],dtype=float)
+ut_bar = np.array([[0]],dtype=float)
+
+xiso = lambda xt: rk4(xt,ut_bar,theta_mpc)
+uiso = lambda ut: rk4(xt_bar,ut,theta_mpc)
+A = jacfwd(xiso)(xt_bar)
+B = jacfwd(uiso)(ut_bar)
+
 #
 # # At this point I have:
 # # zt which is the current inferred state, and is [Nx,Ns]: Ns samples of Nx column vector

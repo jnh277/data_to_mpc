@@ -155,9 +155,7 @@ def pend_simulate(xt,u,w,theta):# w is expected to be 3D. xt is expected to be 2
     for ii in range(Np1):
         x = index_update(x, index[:, :, ii+1], rk4(x[:,:,ii],u[:,ii],theta) + w[:, :, ii]) # slicing creates 2d x into 3d x. Also, Np1 loop will consume all of w
     return x[:, :, 1:]  # return everything except xt 
-    
-xiso = lambda xt: rk4(xt,ut_bar,theta)
-uiso = lambda ut: rk4(xt_bar,ut,theta)
+
 
 # compile cost and create gradient and hessian functions
 sim = jit(pend_simulate)  # static argnums means it will recompile if N changes
