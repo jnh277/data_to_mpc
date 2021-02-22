@@ -67,72 +67,17 @@ def solve_dare(Q,R,A0,B): # http://dx.doi.org/10.1080/00207170410001714988
             break
     return Hp
 
-# Control parameters
-z_star = np.array([[0],[np.pi],[0.0],[0.0]],dtype=float)        # desired set point in z1
-Ns = 1             # number of samples we will use for MC MPC
-Nh = 25              # horizonline of MPC algorithm
-sqc_v = np.array([1,10.0,1e-5,1e-5],dtype=float)            # cost on state error
-sqc = np.diag(sqc_v)
-src = np.array([[0.001]])
 
-# simulation parameters
-T = 100             # number of time steps to simulate and record measurements for
-Ts = 0.025
-z1_0 = -np.pi/4            # initial states
-z2_0 = np.pi/4
-z3_0 = 0.0
-z4_0 = 0.0
 
-# got these values from running HMC on some real data
-r1_true = 0.0011        # measurement noise standard deviation
-r2_true = 0.001
-r3_true = 0.175
-q1_true = 3e-4       # process noise standard deviation
-q2_true = 1e-4      # process noise standard deviation
-q3_true = 0.013       # process noise standard deviation
-q4_true = 0.013      # process noise standard deviation
-
-# got these values from the data sheet
-mr_true = 0.095 # kg
-mp_true = 0.024 # kg
-Lp_true = 0.129 # m
-Lr_true = 0.085 # m
-Jr_true = mr_true * Lr_true * Lr_true / 3 # kgm^2
-Jp_true = mp_true * Lp_true * Lp_true / 3 # kgm^2
-Km_true = 0.042 # Vs/rad / Nm/A
-Rm_true = 8.4 # ohms
-Dp_true = 5e-5 # Nms/rad
-Dr_true = 1e-3 # Nms/rad
-grav = 9.81
-
-theta_true = {
-        'Mp': mp_true,
-        'Lp': Lp_true,
-        'Lr': Lr_true,
-        'Jr': Jr_true,
-        'Jp': Jp_true,
-        'Km': Km_true,
-        'Rm': Rm_true,
-        'Dp': Dp_true,
-        'Dr': Dr_true,
-        'g': grav,
-        'h': Ts
-    }
-
-theta_true = fill_theta(theta_true)
-
-xt_bar = np.array([[0],[np.pi],[0.0],[0.0]],dtype=float).flatten()
-ut_bar = np.array([[0]],dtype=float).flatten()
-
-xiso = lambda xt: rk4(xt,ut_bar,theta_true)
-uiso = lambda ut: rk4(xt_bar,ut,theta_true)
-
-A = jacfwd(rk4,argnums=0)(xt_bar,ut_bar,theta_true)
-print(A)
-B = jacfwd(rk4,argnums=1)(xt_bar,ut_bar,theta_true)
-print(B)
-Q = sqc @ sqc.T
-R = src @ src.T
-P = solve_dare(Q,R,A,B)
-print(P)
+def dare_P(sqc,src,xt_bar,ut_bar,theta):
+    # eps = 10 ** -7
+    # xt_bar = np.array([[0],[np.pi],[0.0],[0.0]],dtype=float).flatten()
+    # ut_bar = np.array([[0]],dtype=float).flatten()
+    # col1 = ( rk4(xt_bar+eps*e1,ut_bar,theta_true) - rk4(xt_bar-eps*e1,ut_bar,theta_true) )/(2*eps)
+    A = jacfwd(rk4,argnums=0)(xt_bar,ut_bar,theta)
+    B = jacrev(rk4,argnums=1)(xt_bar,ut_bar,theta)
+    Q = sqc @ sqc.T
+    R = src @ src.T
+    P = solve_dare(Q,R,A,B)
+    return P
 
