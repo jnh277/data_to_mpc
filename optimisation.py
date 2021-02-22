@@ -441,5 +441,8 @@ def solve_dare(Q,R,A0,B): # http://dx.doi.org/10.1080/00207170410001714988
 
 
 if __name__ == "__main__":
+    ...
+    z_bar = np.array([[0],[np.pi],[0.0],[0.0]],dtype=float)
+    
 
 
