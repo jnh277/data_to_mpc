@@ -35,7 +35,7 @@ from jax.ops import index, index_add, index_update
 from jax.config import config
 
 # optimisation module imports (needs to be done before the jax confix update)
-from optimisation import log_barrier_cost, solve_chance_logbarrier, log_barrier_cosine_cost
+from optimisation import log_barrier_cost, solve_chance_logbarrier, log_barrier_cosine_cost, log_barrier_terminal_cost, log_barrier_cosine_terminal_cost
 
 config.update("jax_enable_x64", True)           # run jax in 64 bit mode for accuracy
 
@@ -47,7 +47,7 @@ zt_bar = jnp.array([[0.0],[np.pi],[0.0],[0.0]]).flatten()
 ut_bar = jnp.array([[0.0]]).flatten()
 
 Ns = 200             # number of samples we will use for MC MPC
-Nh = 5              # horizonline of MPC algorithm
+Nh = 2              # horizonline of MPC algorithm
 # sqc_v = np.array([1,10.0,1e-5,1e-5],dtype=float)            # cost on state error
 sqc_v = np.array([1,30.,1e-5,1e-5],dtype=float)
 sqc = np.diag(sqc_v)
@@ -76,7 +76,7 @@ input_constraints = (lambda u: input_bound - u, lambda u: u + input_bound)
 
 # simulation parameters
 # TODO: WARNING DONT MAKE T > 100 due to size of saved inv_metric
-T = 50             # number of time steps to simulate and record measurements for
+T = 2             # number of time steps to simulate and record measurements for
 Ts = 0.025
 # z1_0 = 0.7*np.pi            # initial states
 # z1_0 = -0.7*np.pi            # initial states
@@ -260,9 +260,9 @@ last_pos = pickle.load(open('stan_traces/last_pos.pkl','rb'))
 
 
 # define MPC cost, gradient and hessian function
-cost = jit(log_barrier_cost, static_argnums=(11,12,13, 14, 15))  # static argnums means it will recompile if N changes
-gradient = jit(grad(log_barrier_cost, argnums=0), static_argnums=(11, 12, 13, 14, 15))    # get compiled function to return gradients with respect to z (uc, s)
-hessian = jit(jacfwd(jacrev(log_barrier_cost, argnums=0)), static_argnums=(11, 12, 13, 14, 15))
+cost = jit(log_barrier_cosine_terminal_cost, static_argnums=(11,12,13, 14, 15))  # static argnums means it will recompile if N changes
+gradient = jit(grad(log_barrier_cosine_terminal_cost, argnums=0), static_argnums=(11, 12, 13, 14, 15))    # get compiled function to return gradients with respect to z (uc, s)
+hessian = jit(jacfwd(jacrev(log_barrier_cosine_terminal_cost, argnums=0)), static_argnums=(11, 12, 13, 14, 15))
 
 # cost = jit(log_barrier_cost, static_argnums=(11,12,13, 14, 15))  # static argnums means it will recompile if N changes
 # gradient = jit(grad(log_barrier_cost, argnums=0), static_argnums=(11, 12, 13, 14, 15))    # get compiled function to return gradients with respect to z (uc, s)
