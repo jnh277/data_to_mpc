@@ -26,6 +26,7 @@ from helpers import plot_trace, col_vec, row_vec, suppress_stdout_stderr
 from pathlib import Path
 import pickle
 from tqdm import tqdm
+from dare import dare_P
 
 # jax related imports
 import jax.numpy as jnp
@@ -41,8 +42,12 @@ config.update("jax_enable_x64", True)           # run jax in 64 bit mode for acc
 
 # Control parameters
 z_star = np.array([[0],[np.pi],[0.0],[0.0]],dtype=float)        # desired set point in z1
+
+zt_bar = jnp.array([[0.0],[np.pi],[0.0],[0.0]]).flatten()
+ut_bar = jnp.array([[0.0]]).flatten()
+
 Ns = 200             # number of samples we will use for MC MPC
-Nh = 25              # horizonline of MPC algorithm
+Nh = 5              # horizonline of MPC algorithm
 # sqc_v = np.array([1,10.0,1e-5,1e-5],dtype=float)            # cost on state error
 sqc_v = np.array([1,30.,1e-5,1e-5],dtype=float)
 sqc = np.diag(sqc_v)
@@ -71,7 +76,7 @@ input_constraints = (lambda u: input_bound - u, lambda u: u + input_bound)
 
 # simulation parameters
 # TODO: WARNING DONT MAKE T > 100 due to size of saved inv_metric
-T = 70             # number of time steps to simulate and record measurements for
+T = 50             # number of time steps to simulate and record measurements for
 Ts = 0.025
 # z1_0 = 0.7*np.pi            # initial states
 # z1_0 = -0.7*np.pi            # initial states
@@ -132,6 +137,33 @@ def fill_theta(t):
     Mp = t['Mp']
     Lr = t['Lr']
     Lp = t['Lp']
+    g = t['g']
+
+    t['Jr + Mp * Lr * Lr'] = Jr + Mp * Lr * Lr
+    t['0.25 * Mp * Lp * Lp'] = 0.25 * Mp * Lp * Lp
+    t['0.5 * Mp * Lp * Lr'] = 0.5 * Mp * Lp * Lr
+    t['m22'] = Jp + 0.25 * Mp * Lp * Lp
+    t['0.5 * Mp * Lp * g'] = 0.5 * Mp * Lp * g
+    return t
+
+def mean_theta(t):
+    t['Jr'] = t['Jr'].mean()
+    t['Jp'] = t['Jp'].mean()
+    t['Km'] = t['Km'].mean()
+    t['Rm'] = t['Rm'].mean()
+    t['Dp'] = t['Dp'].mean()
+    t['Dr'] = t['Dr'].mean()
+
+    Mp = t['Mp']
+    Lr = t['Lr']
+    Lp = t['Lp']
+    Jr = t['Jr']
+    Jp = t['Jp']
+    Km = t['Km']
+    Rm = t['Rm']
+    Dp = t['Dp']
+    Dr = t['Dr']
+
     g = t['g']
 
     t['Jr + Mp * Lr * Lr'] = Jr + Mp * Lr * Lr
@@ -228,9 +260,9 @@ last_pos = pickle.load(open('stan_traces/last_pos.pkl','rb'))
 
 
 # define MPC cost, gradient and hessian function
-cost = jit(log_barrier_cosine_cost, static_argnums=(11,12,13, 14, 15))  # static argnums means it will recompile if N changes
-gradient = jit(grad(log_barrier_cosine_cost, argnums=0), static_argnums=(11, 12, 13, 14, 15))    # get compiled function to return gradients with respect to z (uc, s)
-hessian = jit(jacfwd(jacrev(log_barrier_cosine_cost, argnums=0)), static_argnums=(11, 12, 13, 14, 15))
+cost = jit(log_barrier_cost, static_argnums=(11,12,13, 14, 15))  # static argnums means it will recompile if N changes
+gradient = jit(grad(log_barrier_cost, argnums=0), static_argnums=(11, 12, 13, 14, 15))    # get compiled function to return gradients with respect to z (uc, s)
+hessian = jit(jacfwd(jacrev(log_barrier_cost, argnums=0)), static_argnums=(11, 12, 13, 14, 15))
 
 # cost = jit(log_barrier_cost, static_argnums=(11,12,13, 14, 15))  # static argnums means it will recompile if N changes
 # gradient = jit(grad(log_barrier_cost, argnums=0), static_argnums=(11, 12, 13, 14, 15))    # get compiled function to return gradients with respect to z (uc, s)
@@ -373,8 +405,8 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
         'h': Ts
     }
     theta_mpc = fill_theta(theta_mpc)
-
-
+    theta_dare = mean_theta(theta_mpc)
+    theta_mpc['P'] = dare_P(sqc,src,zt_bar,ut_bar,theta_dare)
 
     # current state samples (reshaped to [o,M])
     xt = z[:,:,-1].T
