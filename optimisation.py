@@ -1,8 +1,11 @@
 
+from jax._src.ops.scatter import index_update
 import numpy as np
 import jax.numpy as jnp
 from jax import grad, jit, device_put, jacfwd, jacrev
+from jax.ops import index, index_update
 from jax.scipy.special import expit
+
 
 from helpers import row_vec
 
@@ -369,3 +372,178 @@ def log_barrier_cosine_cost(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, ga
         cu = 1.0        # ln(cu,mu) = 0
     V3 = logbarrier(cx, mu) + logbarrier(cu, mu)
     return V1 + V2 + V3
+
+def log_barrier_cosine_terminal_cost(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, gamma, simulate, state_constraints, input_constraints, N, Nu):
+    """
+    log barrier cost function for solving the MPC optimisation problem with state chance constraints
+    and input constraints.
+
+    Definitions:
+        o: number of states
+        N: horizon we wish to optimise the control inputs over
+        M: number of samples in the Monte Carlo approximation
+        ncx: number of state constraints (each state constraint is applied over the entire horizon)
+        ncu: number of input constraints (each input constraint is applied over the entire horizon)
+        Nu: dimension of the input
+    Inputs
+        z: array of parameters to be optimised, contains the control inputs (uc), and the chance constraint
+            slack variables (epsilon). uc is size [Nu,N], and epsilon is size [ncx*N,]. These are flattened
+            and stacked.
+        ut: control action applied at current time t, that takes current state x_t to next state x_t
+            has size [Nu,1] or [Nu,]
+        xt: current state
+        x_star: desired state - array of size [o,] or [o,1] to apply the same target over entire horizon
+                OR can be size [o, N] to apply a different target at each time step over horizon
+        theta: dictionary of model parameters, should be M samples of each parameter
+                (stacked in array or some such)
+        w: process noise - array of size [o,M,N+1]
+        sqc: square root of the state error weighting matrix - size [o,o]
+        src: square root of the input weighting matrix - size [1,1]
+        delta: target maximum probability of state constraint violation - scalar or array
+                of size [ncx * N,]. Scalar specifies one value for all constraints over entire horizon
+                Array specifies individual values for each constraint at timestep point in horizon
+        mu: log barrier parameter - scalar
+        gamma: sigmoid indicator function approximation parameter - scalar
+        simulate: function to simulate the evolution of the systems states
+            matching template
+            def simulate(xt, u, w, theta)
+                return array of size [o,M,N] containing x_{t+1},...,x_{t+1+N}
+            where u = [ut,uc]
+            Must contain only jax compatible functions.
+        state_constraints: tuple or list of state constraint functions h_i(x), which
+            the optimisation will satisfy h_i(x) > 0 with probability 1-delta.
+            Each h_i(x) is applied to the entire horizon and needs to return an array
+            of size [o,M,N]. Must contain only jax compatible functions.
+        input_constraints: tuple or list of input constraint functions c_i(u), which
+            the optimisation will make satisfy c_i(u) > 0. Each c_i(u) is applied to
+            the entire horizon and needs to return an array of size [Nu,M,N].
+            Must contain only jax compatible functions.
+        N: the horizon (must be input to avoid dynamic sizing of arrays)
+        Nu: dimension of the input
+
+    returns the cost
+
+    """
+
+
+    # print('Compiling log barrier cost')
+    ncu = len(input_constraints)    # number of input constraints
+    ncx = len(state_constraints)    # number of state constraints
+
+    o = w.shape[0]
+    uc = jnp.reshape(z[:Nu*N], (Nu, N))              # control input variables  #,
+    epsilon = z[Nu*N:N*Nu+ncx*N]                        # slack variables on state constraints
+
+    u = jnp.hstack([ut, uc]) # u_t was already performed, so uc is the next N control actions
+    x = simulate(xt, u, w, theta)
+    # state error and input penalty cost and cost that drives slack variables down
+    V1 = jnp.sum((sqc[1,1] * (jnp.cos(x[1,:,1:]) - jnp.cos(x_star[1,0])))**2) + \
+         jnp.sum((sqc[0, 0] * (x[0, :, 1:] - x_star[0, 0])) ** 2) + \
+         jnp.sum((sqc[2, 2] * (x[2, :, 1:] - x_star[2, 0])) ** 2) + \
+         jnp.sum((sqc[3, 3] * (x[3, :, 1:] - x_star[3, 0])) ** 2) + \
+         jnp.sum(jnp.matmul(src, uc) ** 2) + jnp.sum(300 * (epsilon + 1e3) ** 2)
+    # need a log barrier on each of the slack variables to ensure they are positve
+    V2 = logbarrier(epsilon - delta, mu)     # aiming for 1-delta% accuracy
+    # now the chance constraints
+    if ncx > 0:
+        hx = jnp.concatenate([state_constraint(x[:, :, 1:]) for state_constraint in state_constraints], axis=2)
+        cx = chance_constraint(hx, epsilon, gamma)
+    else:
+        cx = 1.0    # ln(cx,mu) = 0
+
+    if ncu > 0:
+        cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints], axis=1)
+    else:
+        cu = 1.0        # ln(cu,mu) = 0
+    V3 = logbarrier(cx, mu) + logbarrier(cu, mu)
+    x_1 = jnp.mean(x[:,:,-1],axis=1)
+    x_2 = x_star.squeeze()
+    x_1 = index_update(x_1,index[1],jnp.cos(x_1[1]))
+    x_2 = index_update(x_2,index[1],jnp.cos(x_2[1]))
+    x_err = x_1 - x_2 
+    V4 = x_err.T @ theta['P'] @ x_err
+    return V1 + V2 + V3 + V4
+
+def log_barrier_terminal_cost(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, gamma, simulate, state_constraints, input_constraints, N, Nu):
+    """
+    log barrier cost function for solving the MPC optimisation problem with state chance constraints
+    and input constraints.
+
+    Definitions:
+        o: number of states
+        N: horizon we wish to optimise the control inputs over
+        M: number of samples in the Monte Carlo approximation
+        ncx: number of state constraints (each state constraint is applied over the entire horizon)
+        ncu: number of input constraints (each input constraint is applied over the entire horizon)
+        Nu: dimension of the input
+    Inputs
+        z: array of parameters to be optimised, contains the control inputs (uc), and the chance constraint
+            slack variables (epsilon). uc is size [Nu,N], and epsilon is size [ncx*N,]. These are flattened
+            and stacked.
+        ut: control action applied at current time t, that takes current state x_t to next state x_t
+            has size [Nu,1] or [Nu,]
+        xt: current state
+        x_star: desired state - array of size [o,] or [o,1] to apply the same target over entire horizon
+                OR can be size [o, N] to apply a different target at each time step over horizon
+        theta: dictionary of model parameters, should be M samples of each parameter
+                (stacked in array or some such)
+        w: process noise - array of size [o,M,N+1]
+        sqc: square root of the state error weighting matrix - size [o,o]
+        src: square root of the input weighting matrix - size [1,1]
+        delta: target maximum probability of state constraint violation - scalar or array
+                of size [ncx * N,]. Scalar specifies one value for all constraints over entire horizon
+                Array specifies individual values for each constraint at timestep point in horizon
+        mu: log barrier parameter - scalar
+        gamma: sigmoid indicator function approximation parameter - scalar
+        simulate: function to simulate the evolution of the systems states
+            matching template
+            def simulate(xt, u, w, theta)
+                return array of size [o,M,N] containing x_{t+1},...,x_{t+1+N}
+            where u = [ut,uc]
+            Must contain only jax compatible functions.
+        state_constraints: tuple or list of state constraint functions h_i(x), which
+            the optimisation will satisfy h_i(x) > 0 with probability 1-delta.
+            Each h_i(x) is applied to the entire horizon and needs to return an array
+            of size [o,M,N]. Must contain only jax compatible functions.
+        input_constraints: tuple or list of input constraint functions c_i(u), which
+            the optimisation will make satisfy c_i(u) > 0. Each c_i(u) is applied to
+            the entire horizon and needs to return an array of size [Nu,M,N].
+            Must contain only jax compatible functions.
+        N: the horizon (must be input to avoid dynamic sizing of arrays)
+        Nu: dimension of the input
+
+    returns the cost
+
+    """
+
+
+    # print('Compiling log barrier cost')
+    ncu = len(input_constraints)    # number of input constraints
+    ncx = len(state_constraints)    # number of state constraints
+
+    o = w.shape[0]
+    uc = jnp.reshape(z[:Nu*N], (Nu, N))              # control input variables  #,
+    epsilon = z[Nu*N:N*Nu+ncx*N]                        # slack variables on state constraints
+
+    u = jnp.hstack([ut, uc]) # u_t was already performed, so uc is the next N control actions
+    x = simulate(xt, u, w, theta)
+    # state error and input penalty cost and cost that drives slack variables down
+    # potentially np.reshape(x_star,(o,1,-1))??
+    V1 = jnp.sum(jnp.matmul(sqc,jnp.reshape(x[:,:,1:] - jnp.reshape(x_star,(o,1,-1)),(o,-1))) ** 2) + jnp.sum(jnp.matmul(src, uc)**2) + jnp.sum(300 * (epsilon + 1e3)**2)
+    # need a log barrier on each of the slack variables to ensure they are positve
+    V2 = logbarrier(epsilon - delta, mu)     # aiming for 1-delta% accuracy
+    # now the chance constraints
+    if ncx > 0:
+        hx = jnp.concatenate([state_constraint(x[:, :, 1:]) for state_constraint in state_constraints], axis=2)
+        cx = chance_constraint(hx, epsilon, gamma)
+    else:
+        cx = 1.0    # ln(cx,mu) = 0
+
+    if ncu > 0:
+        cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints], axis=1)
+    else:
+        cu = 1.0        # ln(cu,mu) = 0
+    V3 = logbarrier(cx, mu) + logbarrier(cu, mu)
+    x_err = jnp.mean(x[:,:,-1],axis=1) - x_star.squeeze()
+    V4 = x_err.T @ theta['P'] @ x_err
+    return V1 + V2 + V3 + V4

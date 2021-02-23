@@ -26,6 +26,7 @@ from helpers import plot_trace, col_vec, row_vec, suppress_stdout_stderr
 from pathlib import Path
 import pickle
 from tqdm import tqdm
+from dare import dare_P
 
 # jax related imports
 import jax.numpy as jnp
@@ -34,16 +35,19 @@ from jax.ops import index, index_add, index_update
 from jax.config import config
 
 # optimisation module imports (needs to be done before the jax confix update)
-from optimisation import log_barrier_cost, solve_chance_logbarrier, log_barrier_cosine_cost
+from optimisation import log_barrier_cost, solve_chance_logbarrier, log_barrier_cosine_cost, log_barrier_terminal_cost, log_barrier_cosine_terminal_cost
 
 config.update("jax_enable_x64", True)           # run jax in 64 bit mode for accuracy
 
 
 # Control parameters
 z_star = np.array([[0],[np.pi],[0.0],[0.0]],dtype=float)        # desired set point in z1
+
+zt_bar = jnp.array([[0.0],[np.pi],[0.0],[0.0]]).flatten()   # terminal cost linearisation point
+ut_bar = jnp.array([[0.0]]).flatten()
+
 Ns = 200             # number of samples we will use for MC MPC
 Nh = 25              # horizonline of MPC algorithm
-# sqc_v = np.array([1,10.0,1e-5,1e-5],dtype=float)            # cost on state error
 sqc_v = np.array([1,30.,1e-5,1e-5],dtype=float)
 sqc = np.diag(sqc_v)
 src = np.array([[0.001]])
@@ -51,9 +55,7 @@ src = np.array([[0.001]])
 # define the state constraints, (these need to be tuples)
 state_bound = 0.75*np.pi
 input_bound = 18.0
-# state_constraints = (lambda z: 0.75*np.pi - z[[0],:,:],lambda z: z[[0],:,:] + 0.75*np.pi)
 # # define the input constraints
-# input_constraints = (lambda u: 18. - u, lambda u: u + 18.)
 state_constraints = (lambda z: state_bound - z[[0],:,:],lambda z: z[[0],:,:] + state_bound)
 # define the input constraints
 input_constraints = (lambda u: input_bound - u, lambda u: u + input_bound)
@@ -72,19 +74,15 @@ input_constraints = (lambda u: input_bound - u, lambda u: u + input_bound)
 # start making the priors worse
 # run11: 10% prior mean error, 20% standard deviation
 
+# add in terminal cose
+# run12
 
 # simulation parameters
 # TODO: WARNING DONT MAKE T > 100 due to size of saved inv_metric
 T = 50             # number of time steps to simulate and record measurements for
 Ts = 0.025
-# z1_0 = 0.7*np.pi            # initial states
-# z1_0 = -0.7*np.pi            # initial states
-# z1_0 = np.pi - 0.05
 z1_0 = 0.0
-# z1_0 = 0.75*np.pi - 0.1
-# z2_0 = -np.pi/3
 z2_0 = 0.001
-# z2_0 = np.pi-0.1
 z3_0 = 0.0
 z4_0 = 0.0
 
@@ -136,6 +134,33 @@ def fill_theta(t):
     Mp = t['Mp']
     Lr = t['Lr']
     Lp = t['Lp']
+    g = t['g']
+
+    t['Jr + Mp * Lr * Lr'] = Jr + Mp * Lr * Lr
+    t['0.25 * Mp * Lp * Lp'] = 0.25 * Mp * Lp * Lp
+    t['0.5 * Mp * Lp * Lr'] = 0.5 * Mp * Lp * Lr
+    t['m22'] = Jp + 0.25 * Mp * Lp * Lp
+    t['0.5 * Mp * Lp * g'] = 0.5 * Mp * Lp * g
+    return t
+
+def mean_theta(t):
+    t['Jr'] = t['Jr'].mean()
+    t['Jp'] = t['Jp'].mean()
+    t['Km'] = t['Km'].mean()
+    t['Rm'] = t['Rm'].mean()
+    t['Dp'] = t['Dp'].mean()
+    t['Dr'] = t['Dr'].mean()
+
+    Mp = t['Mp']
+    Lr = t['Lr']
+    Lp = t['Lp']
+    Jr = t['Jr']
+    Jp = t['Jp']
+    Km = t['Km']
+    Rm = t['Rm']
+    Dp = t['Dp']
+    Dr = t['Dr']
+
     g = t['g']
 
     t['Jr + Mp * Lr * Lr'] = Jr + Mp * Lr * Lr
@@ -232,9 +257,9 @@ last_pos = pickle.load(open('stan_traces/last_pos.pkl','rb'))
 
 
 # define MPC cost, gradient and hessian function
-cost = jit(log_barrier_cosine_cost, static_argnums=(11,12,13, 14, 15))  # static argnums means it will recompile if N changes
-gradient = jit(grad(log_barrier_cosine_cost, argnums=0), static_argnums=(11, 12, 13, 14, 15))    # get compiled function to return gradients with respect to z (uc, s)
-hessian = jit(jacfwd(jacrev(log_barrier_cosine_cost, argnums=0)), static_argnums=(11, 12, 13, 14, 15))
+cost = jit(log_barrier_cosine_terminal_cost, static_argnums=(11,12,13, 14, 15))  # static argnums means it will recompile if N changes
+gradient = jit(grad(log_barrier_cosine_terminal_cost, argnums=0), static_argnums=(11, 12, 13, 14, 15))    # get compiled function to return gradients with respect to z (uc, s)
+hessian = jit(jacfwd(jacrev(log_barrier_cosine_terminal_cost, argnums=0)), static_argnums=(11, 12, 13, 14, 15))
 
 # cost = jit(log_barrier_cost, static_argnums=(11,12,13, 14, 15))  # static argnums means it will recompile if N changes
 # gradient = jit(grad(log_barrier_cost, argnums=0), static_argnums=(11, 12, 13, 14, 15))    # get compiled function to return gradients with respect to z (uc, s)
@@ -394,8 +419,8 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
         'h': Ts
     }
     theta_mpc = fill_theta(theta_mpc)
-
-
+    theta_dare = mean_theta(theta_mpc)
+    theta_mpc['P'] = dare_P(sqc,src,zt_bar,ut_bar,theta_dare)
 
     # current state samples (reshaped to [o,M])
     xt = z[:,:,-1].T
@@ -419,11 +444,6 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
     # calculate next control action
     if t > 0:
         uc0 = np.hstack((uc[[0],1:],np.reshape(uc[0,-1],(1,1))))
-        # uc0 = uc
-        # mu = result['mu'] * 2 ** 8
-        # gamma = result['gamma'] * 1.25 ** 8
-        # mu = 1e-6 * 2 ** 8
-        # mu = 1e-3 * 1.25 ** 8
         mu = 200
         gamma = 0.2
         result = solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta_mpc, w_mpc, z_star, sqc,
