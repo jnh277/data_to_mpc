@@ -94,8 +94,9 @@ def log_barrier_cost(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, gamma, si
     else:
         cu = 1.0        # ln(cu,mu) = 0
     V3 = logbarrier(cx, mu) + logbarrier(cu, mu)
-    V4 = x[:,0,-1].T @ theta['P'] @ x[:,0,-1]
-    return V1 + V2 + V3 + V4
+    ferr = jnp.reshape(x[:,:,[-1]] - jnp.reshape(x_star,(o,1,-1)),(o,-1)).squeeze()
+    V4 = jnp.cumsum(ferr.T @ theta['P'] @ ferr).flatten()
+    return V1 + V2 + V3 + V4.squeeze()
 
 def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_star, sqc, src, delta, simulate,
                             state_constraints, input_constraints, verbose=True, max_iter=1000, gamma=1.0, mu=1e4,
