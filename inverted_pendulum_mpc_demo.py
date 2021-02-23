@@ -69,9 +69,13 @@ input_constraints = (lambda u: input_bound - u, lambda u: u + input_bound)
 # run9: as above but with +/- 0.75pi on angle, stabilised, start z1_0 at close to 0.75 pi
 # run10: proper static swing up, starting all around 0, proper constraints
 
+# start making the priors worse
+# run11: 10% prior mean error, 20% standard deviation
+
+
 # simulation parameters
 # TODO: WARNING DONT MAKE T > 100 due to size of saved inv_metric
-T = 70             # number of time steps to simulate and record measurements for
+T = 50             # number of time steps to simulate and record measurements for
 Ts = 0.025
 # z1_0 = 0.7*np.pi            # initial states
 # z1_0 = -0.7*np.pi            # initial states
@@ -250,7 +254,7 @@ uc_save = np.zeros((1, Nh, T))
 mpc_result_save = []
 hmc_traces_save = []
 
-# run = 'run10'
+# run = 'run12'
 # with open('results/'+run+'/xt_est_save100.pkl','wb') as file:
 #     pickle.dump(xt_est_save, file)
 # with open('results/'+run+'/theta_est_save100.pkl','wb') as file:
@@ -280,6 +284,23 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
 
 
     # estimate system (estimates up to x_t)
+    ## data and good priors
+    # stan_data ={'no_obs': t+1,
+    #             'Ts':Ts,
+    #             'y': y[:, :t+1],
+    #             'u': u[0, :t+1],
+    #             'Lr':Lr_true,
+    #             'Mp':mp_true,
+    #             'Lp':Lp_true,
+    #             'g':grav,
+    #             'theta_p_mu':np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
+    #             'theta_p_std':0.1*np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
+    #             'r_p_mu': np.array([r1_true, r2_true, r3_true]),
+    #             'r_p_std': 0.5*np.array([r1_true, r2_true, r3_true]),
+    #             'q_p_mu': np.array([q1_true, q2_true, q3_true, q4_true]),
+    #             'q_p_std': np.array([q1_true, q2_true, 0.5*q3_true, 0.5*q3_true]),
+    #             }
+    ## data and slighty worse priors
     stan_data ={'no_obs': t+1,
                 'Ts':Ts,
                 'y': y[:, :t+1],
@@ -288,8 +309,8 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
                 'Mp':mp_true,
                 'Lp':Lp_true,
                 'g':grav,
-                'theta_p_mu':np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
-                'theta_p_std':0.1*np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
+                'theta_p_mu':1.1 * np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
+                'theta_p_std':0.2 * np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
                 'r_p_mu': np.array([r1_true, r2_true, r3_true]),
                 'r_p_std': 0.5*np.array([r1_true, r2_true, r3_true]),
                 'q_p_mu': np.array([q1_true, q2_true, q3_true, q4_true]),
@@ -445,7 +466,7 @@ plt.plot(z_sim[1,0,:],label='True',color='k')
 plt.plot(xt_est_save[:,1,:].mean(axis=0), color='b',label='mean')
 plt.plot(np.percentile(xt_est_save[:,1,:],97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
 plt.plot(np.percentile(xt_est_save[:,1,:],2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-plt.axhline(z_star[1,0], linestyle='--', color='g', linewidth=2, label='target')
+plt.axhline(-z_star[1,0], linestyle='--', color='g', linewidth=2, label='target')
 plt.ylabel('pendulum angle')
 plt.legend()
 
@@ -492,3 +513,32 @@ plt.title('Predicted future pendulum angles')
 plt.show()
 
 
+ind = 0
+plt.plot(theta_est_save[:,ind,:].mean(axis=0),color='b',label='mean')
+plt.plot(np.percentile(theta_est_save[:,ind,:],97.5,axis=0),color='b',linestyle='--',label='95% CI')
+plt.plot(np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color='b',linestyle='--')
+plt.axhline(Jr_true,color='k',label='True')
+plt.legend()
+plt.xlabel('time step')
+plt.title('Jr estimate over simulation')
+plt.show()
+
+ind = 2
+plt.plot(theta_est_save[:,ind,:].mean(axis=0),color='b',label='mean')
+plt.plot(np.percentile(theta_est_save[:,ind,:],97.5,axis=0),color='b',linestyle='--',label='95% CI')
+plt.plot(np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color='b',linestyle='--')
+plt.axhline(Km_true,color='k',label='True')
+plt.legend()
+plt.xlabel('time step')
+plt.title('Km estimate over simulation')
+plt.show()
+
+ind = 3
+plt.plot(theta_est_save[:,ind,:].mean(axis=0),color='b',label='mean')
+plt.plot(np.percentile(theta_est_save[:,ind,:],97.5,axis=0),color='b',linestyle='--',label='95% CI')
+plt.plot(np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color='b',linestyle='--')
+plt.axhline(Rm_true,color='k',label='True')
+plt.legend()
+plt.xlabel('time step')
+plt.title('Rm estimate over simulation')
+plt.show()
