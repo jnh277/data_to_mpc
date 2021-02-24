@@ -292,10 +292,12 @@ plt.show()
 
 import matplotlib.animation as manimation
 FFMpegWriter = manimation.writers['ffmpeg']
-metadata = dict(title='pendulum_movie', artist='Matplotlib')
-writer = FFMpegWriter(fps=10, metadata=metadata)
-
-
+writer = manimation.FFMpegFileWriter(fps=15)
+# FFMpegFileWriter = manimation.writers['ffmpegfile']
+# metadata = dict(title='pendulum_movie', artist='Matplotlib')
+# writer = FFMpegWriter(fps=10, metadata=metadata)
+# writer = FFMpegWriter(fps=10)
+# writer = FFMpegFileWriter(fps=15
 # fig,ax =  plt.subplots(2,2, gridspec_kw={
 #                             'width_ratios':[2,1],
 #                             'height_ratios':[2,1]})
@@ -329,7 +331,7 @@ ax[0].set_xlabel('Arm angle (deg)')
 
 # set up second plot
 ts = np.arange(t+1)*0.025
-
+#
 ax[1].axhline(Jr_true,color='k',linestyle='--',linewidth=1.0,label='True')
 ax[1].axis([0,49.*0.025,1.78e-4,3.6e-4])
 ax[1].set_ylabel('Jr')
@@ -339,17 +341,17 @@ l2, = ax[1].plot(ts,theta_est_save[:,ind,0:t+1].mean(axis=0),color='b',label='me
 l3, = ax[1].plot(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0),color='b',linestyle='--',label='95% CI')
 l4, = ax[1].plot(ts,np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0),color='b',linestyle='--')
 ax[1].legend()
-
-# set up third plot
-ax[2].axhline(Rm_true,color='k',linestyle='--',linewidth=1.0,label='True')
-ax[2].axis([0,49.*0.025,5.,12.5])
-ax[2].set_ylabel('Rm')
-ax[2].set_xlabel('t (s)')
-ind = 3
-l5, = ax[2].plot(ts,theta_est_save[:,ind,0:t+1].mean(axis=0),color='b',label='mean')
-l6, = ax[2].plot(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0),color='b',linestyle='--',label='95% CI')
-l7, = ax[2].plot(ts,np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0),color='b',linestyle='--')
-ax[2].legend()
+#
+# # set up third plot
+# ax[2].axhline(Rm_true,color='k',linestyle='--',linewidth=1.0,label='True')
+# ax[2].axis([0,49.*0.025,5.,12.5])
+# ax[2].set_ylabel('Rm')
+# ax[2].set_xlabel('t (s)')
+# ind = 3
+# l5, = ax[2].plot(ts,theta_est_save[:,ind,0:t+1].mean(axis=0),color='b',label='mean')
+# l6, = ax[2].plot(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0),color='b',linestyle='--',label='95% CI')
+# l7, = ax[2].plot(ts,np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0),color='b',linestyle='--')
+# ax[2].legend()
 # plt.show()
 
 with writer.saving(fig, "inverted_pendulum.mp4", 100):
@@ -361,11 +363,11 @@ with writer.saving(fig, "inverted_pendulum.mp4", 100):
         l2.set_data(ts,theta_est_save[:,ind,0:t+1].mean(axis=0))
         l3.set_data(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0))
         l4.set_data(ts,np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0))
-        ind = 3
-        l5.set_data(ts,theta_est_save[:,ind,0:t+1].mean(axis=0))
-        l6.set_data(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0))
-        l7.set_data(ts,np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0))
-        
+        # ind = 3
+        # l5.set_data(ts,theta_est_save[:,ind,0:t+1].mean(axis=0))
+        # l6.set_data(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0))
+        # l7.set_data(ts,np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0))
+
         writer.grab_frame()
     # for i in range(10): # repeat last frame 10 times
     #     px = np.array([z_sim[0, 0, t], z_sim[0, 0, t] + pl * np.sin(z_sim[1, 0, t])])
