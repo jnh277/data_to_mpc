@@ -292,11 +292,11 @@ plt.show()
 
 import matplotlib.animation as manimation
 FFMpegWriter = manimation.writers['ffmpeg']
-writer = manimation.FFMpegFileWriter(fps=15)
+# writer = manimation.FFMpegFileWriter(fps=15)
 # FFMpegFileWriter = manimation.writers['ffmpegfile']
 # metadata = dict(title='pendulum_movie', artist='Matplotlib')
 # writer = FFMpegWriter(fps=10, metadata=metadata)
-# writer = FFMpegWriter(fps=10)
+writer = FFMpegWriter(fps=10)
 # writer = FFMpegFileWriter(fps=15
 # fig,ax =  plt.subplots(2,2, gridspec_kw={
 #                             'width_ratios':[2,1],
@@ -305,75 +305,81 @@ writer = manimation.FFMpegFileWriter(fps=15)
 # plt.show()
 t = 10
 pl = 0.5
+for t in range(T):
+    fig, ax = plt.subplots(3,1,gridspec_kw={'width_ratios':[1],
+                                            'height_ratios':[2,1,1]})
 
-fig, ax = plt.subplots(3,1,gridspec_kw={'width_ratios':[1],
-                                        'height_ratios':[2,1,1]})
+    ## set up first plot
+    l, = ax[0].plot([], [], 'k-o')
+    ax[0].axhline(0.0,color='k',linestyle='--',linewidth=0.5)
+    ax[0].axvline(-0.75*np.pi,color='r',linestyle='--',linewidth=1.0)
+    ax[0].axvline(0.75*np.pi,color='r',linestyle='--',linewidth=1.0)
+    ax[0].axis('equal')
+    ax[0].axis([-0.8*np.pi,0.8*np.pi,-100,100])
 
-## set up first plot
-l, = ax[0].plot([], [], 'k-o')
-ax[0].axhline(0.0,color='k',linestyle='--',linewidth=0.5)
-ax[0].axvline(-0.75*np.pi,color='r',linestyle='--',linewidth=1.0)
-ax[0].axvline(0.75*np.pi,color='r',linestyle='--',linewidth=1.0)
-ax[0].axis('equal')
-ax[0].axis([-0.8*np.pi,0.8*np.pi,-100,100])
-
-px = np.array([z_sim[0,0,t],z_sim[0,0,t]+pl*np.sin(z_sim[1,0,t])])
-py = np.array([0.,-pl*np.cos(z_sim[1,0,t])])
-
-
-l.set_data(px,py)
-labels = [str(int(val/np.pi*180.)) for val in np.linspace(-0.8*np.pi,0.8*np.pi,7)]
-ax[0].set_xticks(np.linspace(-0.8*np.pi,0.8*np.pi,7))
-ax[0].set_xticklabels(labels)
-ax[0].set_yticks([])
-ax[0].set_xlabel('Arm angle (deg)')
+    px = np.array([z_sim[0,0,t],z_sim[0,0,t]+pl*np.sin(z_sim[1,0,t])])
+    py = np.array([0.,-pl*np.cos(z_sim[1,0,t])])
 
 
-# set up second plot
-ts = np.arange(t+1)*0.025
-#
-ax[1].axhline(Jr_true,color='k',linestyle='--',linewidth=1.0,label='True')
-ax[1].axis([0,49.*0.025,1.78e-4,3.6e-4])
-ax[1].set_ylabel('Jr')
-ax[1].set_xlabel('t (s)')
-ind = 0
-l2, = ax[1].plot(ts,theta_est_save[:,ind,0:t+1].mean(axis=0),color='b',label='mean')
-l3, = ax[1].plot(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0),color='b',linestyle='--',label='95% CI')
-l4, = ax[1].plot(ts,np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0),color='b',linestyle='--')
-ax[1].legend()
-#
-# # set up third plot
-# ax[2].axhline(Rm_true,color='k',linestyle='--',linewidth=1.0,label='True')
-# ax[2].axis([0,49.*0.025,5.,12.5])
-# ax[2].set_ylabel('Rm')
-# ax[2].set_xlabel('t (s)')
-# ind = 3
-# l5, = ax[2].plot(ts,theta_est_save[:,ind,0:t+1].mean(axis=0),color='b',label='mean')
-# l6, = ax[2].plot(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0),color='b',linestyle='--',label='95% CI')
-# l7, = ax[2].plot(ts,np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0),color='b',linestyle='--')
-# ax[2].legend()
+    l.set_data(px,py)
+    labels = [str(int(val/np.pi*180.)) for val in np.linspace(-0.8*np.pi,0.8*np.pi,7)]
+    ax[0].set_xticks(np.linspace(-0.8*np.pi,0.8*np.pi,7))
+    ax[0].set_xticklabels(labels)
+    ax[0].set_yticks([])
+    ax[0].set_xlabel('Arm angle (deg)')
+
+
+    # set up second plot
+    ts = np.arange(t+1)*0.025
+    #
+    ax[1].axhline(Jr_true,color='k',linestyle='--',linewidth=1.0,label='True')
+    ax[1].axis([0,49.*0.025,1.78e-4,3.6e-4])
+    ax[1].set_ylabel('Jr')
+    ax[1].set_xlabel('t (s)')
+    ind = 0
+    l2, = ax[1].plot(ts,theta_est_save[:,ind,0:t+1].mean(axis=0),color='b',label='mean')
+    l3, = ax[1].plot(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0),color='b',linestyle='--',label='95% CI')
+    l4, = ax[1].plot(ts,np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0),color='b',linestyle='--')
+    ax[1].legend(loc='center right')
+    ax[1].ticklabel_format(style='sci',scilimits=(-1,1))
+    #
+    # set up third plot
+    ax[2].axhline(Rm_true,color='k',linestyle='--',linewidth=1.0,label='True')
+    ax[2].axis([0,49.*0.025,5.,12.5])
+    ax[2].set_ylabel('Rm')
+    ax[2].set_xlabel('t (s)')
+    ind = 3
+    l5, = ax[2].plot(ts,theta_est_save[:,ind,0:t+1].mean(axis=0),color='b',label='mean')
+    l6, = ax[2].plot(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0),color='b',linestyle='--',label='95% CI')
+    l7, = ax[2].plot(ts,np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0),color='b',linestyle='--')
+    ax[2].legend(loc='center right')
+    plt.tight_layout()
+    plt.savefig('movie_frames/frame'+str(t)+'.png',format='png')
+
 # plt.show()
 
-with writer.saving(fig, "inverted_pendulum.mp4", 100):
-    for t in range(T):
-        px = np.array([z_sim[0, 0, t], z_sim[0, 0, t] + pl * np.sin(z_sim[1, 0, t])])
-        py = np.array([0., -pl * np.cos(z_sim[1, 0, t])])
-        l.set_data(px,py)
-        ind = 0
-        l2.set_data(ts,theta_est_save[:,ind,0:t+1].mean(axis=0))
-        l3.set_data(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0))
-        l4.set_data(ts,np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0))
-        # ind = 3
-        # l5.set_data(ts,theta_est_save[:,ind,0:t+1].mean(axis=0))
-        # l6.set_data(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0))
-        # l7.set_data(ts,np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0))
+# for t in range(T):
+#     px = np.array([z_sim[0, 0, t], z_sim[0, 0, t] + pl * np.sin(z_sim[1, 0, t])])
+#     py = np.array([0., -pl * np.cos(z_sim[1, 0, t])])
+#     l.set_data(px,py)
+#     ind = 0
+#     l2.set_data(ts,theta_est_save[:,ind,0:t+1].mean(axis=0))
+#     l3.set_data(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0))
+#     l4.set_data(ts,np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0))
+#
+#     ind = 3
+#     l5.set_data(ts,theta_est_save[:,ind,0:t+1].mean(axis=0))
+#     l6.set_data(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0))
+#     l7.set_data(ts,np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0))
+#     # plt.savefig('./movie_frames/frame' + str(t) + '.png', format='png')
+#     plt.show()
+#         # writer.grab_frame()
+# for i in range(10): # repeat last frame 10 times
+#     px = np.array([z_sim[0, 0, t], z_sim[0, 0, t] + pl * np.sin(z_sim[1, 0, t])])
+#     py = np.array([0., -pl * np.cos(z_sim[1, 0, t])])
+#     l.set_data(px,py)
+#     # plt.savefig('./movie_frames/frame' + str(t+i) + '.png', format='png')
 
-        writer.grab_frame()
-    # for i in range(10): # repeat last frame 10 times
-    #     px = np.array([z_sim[0, 0, t], z_sim[0, 0, t] + pl * np.sin(z_sim[1, 0, t])])
-    #     py = np.array([0., -pl * np.cos(z_sim[1, 0, t])])
-    #     l.set_data(px,py)
-    #     writer.grab_frame()
 
 # for t in range(T):
 #     plt.plot(np.arange(Nh)+t,uc_save[0,:,t])
