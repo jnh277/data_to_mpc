@@ -290,13 +290,13 @@ plt.show()
 #     line.set_data(x,y)
 #     return line,
 
-import matplotlib.animation as manimation
-FFMpegWriter = manimation.writers['ffmpeg']
-# writer = manimation.FFMpegFileWriter(fps=15)
-# FFMpegFileWriter = manimation.writers['ffmpegfile']
-# metadata = dict(title='pendulum_movie', artist='Matplotlib')
-# writer = FFMpegWriter(fps=10, metadata=metadata)
-writer = FFMpegWriter(fps=10)
+# import matplotlib.animation as manimation
+# FFMpegWriter = manimation.writers['ffmpeg']
+# # writer = manimation.FFMpegFileWriter(fps=15)
+# # FFMpegFileWriter = manimation.writers['ffmpegfile']
+# # metadata = dict(title='pendulum_movie', artist='Matplotlib')
+# # writer = FFMpegWriter(fps=10, metadata=metadata)
+# writer = FFMpegWriter(fps=10)
 # writer = FFMpegFileWriter(fps=15
 # fig,ax =  plt.subplots(2,2, gridspec_kw={
 #                             'width_ratios':[2,1],
@@ -305,10 +305,10 @@ writer = FFMpegWriter(fps=10)
 # plt.show()
 t = 10
 pl = 0.5
-for t in range(T):
+for t in range(T+15):
     fig, ax = plt.subplots(3,1,gridspec_kw={'width_ratios':[1],
                                             'height_ratios':[2,1,1]})
-
+    t = min(t,T-1)
     ## set up first plot
     l, = ax[0].plot([], [], 'k-o')
     ax[0].axhline(0.0,color='k',linestyle='--',linewidth=0.5)
@@ -355,68 +355,6 @@ for t in range(T):
     ax[2].legend(loc='center right')
     plt.tight_layout()
     plt.savefig('movie_frames/frame'+str(t)+'.png',format='png')
+    plt.close(fig)
 
-# plt.show()
-
-# for t in range(T):
-#     px = np.array([z_sim[0, 0, t], z_sim[0, 0, t] + pl * np.sin(z_sim[1, 0, t])])
-#     py = np.array([0., -pl * np.cos(z_sim[1, 0, t])])
-#     l.set_data(px,py)
-#     ind = 0
-#     l2.set_data(ts,theta_est_save[:,ind,0:t+1].mean(axis=0))
-#     l3.set_data(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0))
-#     l4.set_data(ts,np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0))
-#
-#     ind = 3
-#     l5.set_data(ts,theta_est_save[:,ind,0:t+1].mean(axis=0))
-#     l6.set_data(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0))
-#     l7.set_data(ts,np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0))
-#     # plt.savefig('./movie_frames/frame' + str(t) + '.png', format='png')
-#     plt.show()
-#         # writer.grab_frame()
-# for i in range(10): # repeat last frame 10 times
-#     px = np.array([z_sim[0, 0, t], z_sim[0, 0, t] + pl * np.sin(z_sim[1, 0, t])])
-#     py = np.array([0., -pl * np.cos(z_sim[1, 0, t])])
-#     l.set_data(px,py)
-#     # plt.savefig('./movie_frames/frame' + str(t+i) + '.png', format='png')
-
-
-# for t in range(T):
-#     plt.plot(np.arange(Nh)+t,uc_save[0,:,t])
-# plt.title('Control over horizon from each MPC solve')
-# plt.show()
-
-# if len(state_constraints) > 0:
-#     x_mpc = sim(xt, np.hstack([ut, uc]), w_mpc, theta_mpc)
-#     hx = np.concatenate([state_constraint(x_mpc[:, :, 1:]) for state_constraint in state_constraints], axis=2)
-#     cx = np.mean(hx > 0, axis=1)
-#     print('State constraint satisfaction')
-#     print(cx)
-# if len(input_constraints) > 0:
-#     cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints],axis=1)
-#     print('Input constraint satisfaction')
-#     print(cu >= 0)
-# #
-# for i in range(6):
-#     plt.subplot(2,3,i+1)
-#     plt.hist(x_mpc[1,:, i*4], label='MC forward sim')
-#     if i==1:
-#         plt.title('MPC solution over horizon')
-#     plt.axvline(z_star[1,0], linestyle='--', color='g', linewidth=2, label='target')
-#     plt.xlabel('t+'+str(i*4+1))
-# plt.tight_layout()
-# plt.legend()
-# plt.show()
-
-
-
-# plt.plot(x_mpc[0,:,:].mean(axis=0))
-# plt.title('Predicted future arm angles')
-# plt.axhline(state_bound, linestyle='--', color='r', linewidth=2, label='constraint')
-# plt.axhline(-state_bound, linestyle='--', color='r', linewidth=2)
-# plt.show()
-#
-# plt.plot(x_mpc[1,:,:].mean(axis=0))
-# plt.axhline(z_star[1,0], linestyle='--', color='g', linewidth=2, label='target')
-# plt.title('Predicted future pendulum angles')
-# plt.show()
+# compile frames into movie using ffmpeg -i "frame%d.png"  test.m4v
