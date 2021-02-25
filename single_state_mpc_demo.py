@@ -51,7 +51,7 @@ src = np.array([[0.01]])             # square root cost on control action
 delta = 0.05                        # desired maximum probability of not satisfying the constraint
 
 x_ub = 1.2
-u_ub = 3.
+u_ub = 2.
 state_constraints = (lambda x: x_ub - x,)
 input_constraints = (lambda u: u_ub - u,)
 
@@ -111,6 +111,29 @@ a_est_save = np.zeros((M,T))
 b_est_save = np.zeros((M,T))
 q_est_save = np.zeros((M,T))
 r_est_save = np.zeros((M,T))
+mpc_result_save = []
+hmc_traces_save = []
+
+run = 'single_state_run2'
+with open('results/'+run+'/xt_est_save.pkl','wb') as file:
+    pickle.dump(xt_est_save, file)
+with open('results/'+run+'/a_est_save.pkl','wb') as file:
+    pickle.dump(a_est_save, file)
+with open('results/'+run+'/b_est_save.pkl','wb') as file:
+    pickle.dump(b_est_save, file)
+with open('results/'+run+'/q_est_save.pkl','wb') as file:
+    pickle.dump(q_est_save, file)
+with open('results/'+run+'/r_est_save.pkl','wb') as file:
+    pickle.dump(r_est_save, file)
+with open('results/'+run+'/x.pkl','wb') as file:
+    pickle.dump(x, file)
+with open('results/'+run+'/u.pkl','wb') as file:
+    pickle.dump(u, file)
+with open('results/'+run+'/mpc_result_save100.pkl', 'wb') as file:
+    pickle.dump(mpc_result_save, file)
+
+
+
 ### SIMULATE SYSTEM AND PERFORM MPC CONTROL
 for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control'):
     # simulate system
@@ -128,11 +151,12 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
         'prior_mu': np.array([0.8, 0.05, 0.1, 0.1]),
         'prior_std': np.array([0.2, 0.2, 0.2, 0.2]),
         'prior_state_mu': 0.3,
-        'prior_state_std': 0.2,
+        'prior_state_std': 0.3,
     }
     with suppress_stdout_stderr():
         fit = model.sampling(data=stan_data, warmup=warmup, iter=iter, chains=chains)
     traces = fit.extract()
+    hmc_traces_save.append(traces)
 
     # state samples
     z = traces['z']
@@ -161,16 +185,18 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
     # calculate next control action
     result = solve_chance_logbarrier(np.zeros((1, N)), cost, gradient, hessian, ut, xt, theta, w, x_star, sqc, src,
                                      delta, simulate, state_constraints, input_constraints, verbose=False)
-
+    mpc_result_save.append(result)
     uc = result['uc']
     u[t+1] = uc[0,0]
 
 
 plt.subplot(2,1,1)
+#print(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+plt.fill_between(np.arange(T),np.percentile(xt_est_save[0,:,:],97.5,axis=0),np.percentile(xt_est_save[0,:,:],2.5,axis=0),alpha=0.2,label='95% CI',color=u'#1f77b4')
 plt.plot(x,label='True', color='k')
-plt.plot(xt_est_save[0,:,:].mean(axis=0), color='b',label='mean')
-plt.plot(np.percentile(xt_est_save[0,:,:],97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-plt.plot(np.percentile(xt_est_save[0,:,:],2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
+plt.plot(xt_est_save[0,:,:].mean(axis=0),label='mean',color=u'#1f77b4',linestyle='--')
+# plt.plot(np.percentile(xt_est_save[0,:,:],97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
+# plt.plot(np.percentile(xt_est_save[0,:,:],2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
 plt.ylabel('x')
 plt.axhline(x_ub,linestyle='--',color='r',linewidth=2.,label='constraint')
 plt.axhline(x_star,linestyle='--',color='g',linewidth=2.,label='target')
@@ -180,43 +206,50 @@ plt.subplot(2,1,2)
 plt.plot(u)
 plt.axhline(u_ub,linestyle='--',color='r',linewidth=2.,label='constraint')
 plt.ylabel('u')
-plt.xlabel('t')
+plt.xlabel(r'$t$')
 
 plt.tight_layout()
 plt.show()
 
 plt.subplot(2,2,1)
 plt.plot(a_est_save.mean(axis=0),label='mean')
-plt.plot(np.percentile(a_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-plt.plot(np.percentile(a_est_save,2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-plt.ylabel('a')
+plt.fill_between(np.arange(T),np.percentile(a_est_save,97.5,axis=0),np.percentile(a_est_save,2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+# plt.plot(np.percentile(a_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
+# plt.plot(np.percentile(a_est_save,2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
+plt.ylabel(r'$a$')
 plt.axhline(0.9,linestyle='--',color='k',linewidth=2.,label='true')
 plt.legend()
+plt.xlabel(r'$t$')
 
 plt.subplot(2,2,2)
 plt.plot(b_est_save.mean(axis=0),label='mean')
-plt.plot(np.percentile(b_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-plt.plot(np.percentile(b_est_save,2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-plt.ylabel('b')
+plt.fill_between(np.arange(T),np.percentile(b_est_save,97.5,axis=0),np.percentile(b_est_save,2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+# plt.plot(np.percentile(b_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
+# plt.plot(np.percentile(b_est_save,2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
+plt.ylabel(r'$b$')
 plt.axhline(0.1,linestyle='--',color='k',linewidth=2.,label='true')
 plt.legend()
+plt.xlabel(r'$t$')
 
 plt.subplot(2,2,3)
 plt.plot(q_est_save.mean(axis=0),label='mean')
-plt.plot(np.percentile(q_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-plt.plot(np.percentile(q_est_save,2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-plt.ylabel('q')
+plt.fill_between(np.arange(T),np.percentile(q_est_save,97.5,axis=0),np.percentile(q_est_save,2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+# plt.plot(np.percentile(q_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
+# plt.plot(np.percentile(q_est_save,2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
+plt.ylabel(r'$q$')
 plt.axhline(q_true,linestyle='--',color='k',linewidth=2.,label='true')
 plt.legend()
-plt.xlabel('t')
+plt.xlabel(r'$t$')
 
 plt.subplot(2,2,4)
 plt.plot(r_est_save.mean(axis=0),label='mean')
-plt.plot(np.percentile(r_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-plt.plot(np.percentile(r_est_save,2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-plt.ylabel('r')
+plt.fill_between(np.arange(T),np.percentile(r_est_save,97.5,axis=0),np.percentile(r_est_save,2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+# plt.plot(np.percentile(r_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
+# plt.plot(np.percentile(r_est_save,2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
+plt.ylabel(r'$r$')
 plt.axhline(r_true,linestyle='--',color='k',linewidth=2.,label='true')
 plt.legend()
-plt.xlabel('t')
+plt.xlabel(r'$t$')
 
+plt.tight_layout()
 plt.show()
