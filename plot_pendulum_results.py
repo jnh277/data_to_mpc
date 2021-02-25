@@ -37,8 +37,8 @@ from jax.config import config
 from optimisation import log_barrier_cost, solve_chance_logbarrier, log_barrier_cosine_cost
 
 config.update("jax_enable_x64", True)           # run jax in 64 bit mode for accuracy
-
-
+plt.rcParams["font.family"] = "Times New Roman"
+# lfont = {'fontname':''}
 # Control parameters
 z_star = np.array([[0],[np.pi],[0.0],[0.0]],dtype=float)        # desired set point in z1
 Ns = 200             # number of samples we will use for MC MPC
@@ -312,8 +312,8 @@ for t in range(T+15):
     ## set up first plot
     l, = ax[0].plot([], [], 'k-o')
     ax[0].axhline(0.0,color='k',linestyle='--',linewidth=0.5)
-    ax[0].axvline(-0.75*np.pi,color='r',linestyle='--',linewidth=1.0)
-    ax[0].axvline(0.75*np.pi,color='r',linestyle='--',linewidth=1.0)
+    ax[0].axvline(-0.75*np.pi,color='r',linestyle='--',linewidth=0.75)
+    ax[0].axvline(0.75*np.pi,color='r',linestyle='--',linewidth=0.75)
     ax[0].axis('equal')
     ax[0].axis([-0.8*np.pi,0.8*np.pi,-100,100])
 
@@ -326,32 +326,32 @@ for t in range(T+15):
     ax[0].set_xticks(np.linspace(-0.8*np.pi,0.8*np.pi,7))
     ax[0].set_xticklabels(labels)
     ax[0].set_yticks([])
-    ax[0].set_xlabel('Arm angle (deg)')
+    ax[0].set_xlabel(r'Base arm angle ($^{\circ}$)')
 
 
     # set up second plot
     ts = np.arange(t+1)*0.025
     #
-    ax[1].axhline(Jr_true,color='k',linestyle='--',linewidth=1.0,label='True')
+    ax[1].axhline(Jr_true,color='k',linestyle='--',linewidth=0.75,label='True')
     ax[1].axis([0,49.*0.025,1.78e-4,3.6e-4])
-    ax[1].set_ylabel('Jr')
+    ax[1].set_ylabel(r'$J_r$')
     ax[1].set_xlabel('t (s)')
     ind = 0
-    l2, = ax[1].plot(ts,theta_est_save[:,ind,0:t+1].mean(axis=0),color='b',label='mean')
-    l3, = ax[1].plot(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0),color='b',linestyle='--',label='95% CI')
-    l4, = ax[1].plot(ts,np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0),color='b',linestyle='--')
+    l2, = ax[1].plot(ts,theta_est_save[:,ind,0:t+1].mean(axis=0),color=u'#1f77b4',linewidth=1,label='mean')
+    ax[1].fill_between(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0),np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
     ax[1].legend(loc='center right')
     ax[1].ticklabel_format(style='sci',scilimits=(-1,1))
     #
     # set up third plot
-    ax[2].axhline(Rm_true,color='k',linestyle='--',linewidth=1.0,label='True')
+    ax[2].axhline(Rm_true,color='k',linestyle='--',linewidth=0.75,label='True')
     ax[2].axis([0,49.*0.025,5.,12.5])
-    ax[2].set_ylabel('Rm')
+    ax[2].set_ylabel(r'$R_m$')
     ax[2].set_xlabel('t (s)')
     ind = 3
-    l5, = ax[2].plot(ts,theta_est_save[:,ind,0:t+1].mean(axis=0),color='b',label='mean')
-    l6, = ax[2].plot(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0),color='b',linestyle='--',label='95% CI')
-    l7, = ax[2].plot(ts,np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0),color='b',linestyle='--')
+    l5, = ax[2].plot(ts,theta_est_save[:,ind,0:t+1].mean(axis=0),color=u'#1f77b4',linewidth=1,label='mean')
+    ax[2].fill_between(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0),np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+    # l6, = ax[2].plot(ts,np.percentile(theta_est_save[:,ind,0:t+1],97.5,axis=0),color='b',linestyle='--',label='95% CI')
+    # l7, = ax[2].plot(ts,np.percentile(theta_est_save[:,ind,0:t+1],2.5,axis=0),color='b',linestyle='--')
     ax[2].legend(loc='center right')
     plt.tight_layout()
     plt.savefig('movie_frames/frame'+str(t)+'.png',format='png')
