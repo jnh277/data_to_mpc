@@ -26,6 +26,7 @@ from helpers import plot_trace, col_vec, row_vec, suppress_stdout_stderr
 from pathlib import Path
 import pickle
 from tqdm import tqdm
+import seaborn as sns
 
 # jax related imports
 import jax.numpy as jnp
@@ -217,64 +218,108 @@ with open('results/'+run+'/uc_save100.pkl', 'rb') as file:
     uc_save = pickle.load(file)
 
 ## Plot results
+plotme1 = True
+if plotme1:
+    ts = np.arange(50)*0.025
+    plt.plot(u[0,:])
+    plt.title('MPC determined control action')
+    plt.axhline(input_bound, linestyle='--', color='r', linewidth=2, label='constraint')
+    plt.axhline(-input_bound, linestyle='--', color='r', linewidth=2, label='constraint')
+    plt.savefig('stills/plot_action'+'.png',format='png')
+    plt.close()
+    # plt.show()
 
-plt.plot(u[0,:])
-plt.title('MPC determined control action')
-plt.axhline(input_bound, linestyle='--', color='r', linewidth=2, label='constraint')
-plt.axhline(-input_bound, linestyle='--', color='r', linewidth=2, label='constraint')
-plt.show()
-
-plt.subplot(2, 1, 1)
-plt.plot(z_sim[0,0,:],label='True',color='k')
-plt.plot(xt_est_save[:,0,:].mean(axis=0), color='b',label='mean')
-plt.plot(np.percentile(xt_est_save[:,0,:],97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-plt.plot(np.percentile(xt_est_save[:,0,:],2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-plt.axhline(state_bound, linestyle='--', color='r', linewidth=2, label='constraint')
-plt.axhline(-state_bound, linestyle='--', color='r', linewidth=2)
-plt.ylabel('arm angle')
-plt.legend()
-
-plt.subplot(2, 1, 2)
-plt.plot(z_sim[1,0,:],label='True',color='k')
-plt.plot(xt_est_save[:,1,:].mean(axis=0), color='b',label='mean')
-plt.plot(np.percentile(xt_est_save[:,1,:],97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-plt.plot(np.percentile(xt_est_save[:,1,:],2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-plt.axhline(-z_star[1,0], linestyle='--', color='g', linewidth=2, label='target')
-plt.ylabel('pendulum angle')
-plt.legend()
-
-plt.show()
+    # plt.subplot(2, 1, 1)
+    # plt.plot(xt_est_save[:,0,:].mean(axis=0), color=u'#1f77b4',label='mean')
+    # plt.plot(z_sim[0,0,:],label='True',color='k')
+    # plt.fill_between(np.percentile(xt_est_save[:,0,:],97.5,axis=0),np.percentile(xt_est_save[:,0,:],2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+    # plt.axhline(state_bound, linestyle='--', color='r', linewidth=2, label='constraint')
+    # plt.axhline(-state_bound, linestyle='--', color='r', linewidth=2)
+    # plt.ylabel('arm angle')
+    # plt.legend()
 
 
-ind = 0
-plt.plot(theta_est_save[:,ind,:].mean(axis=0),color='b',label='mean')
-plt.plot(np.percentile(theta_est_save[:,ind,:],97.5,axis=0),color='b',linestyle='--',label='95% CI')
-plt.plot(np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color='b',linestyle='--')
-plt.axhline(Jr_true,color='k',label='True')
-plt.legend()
-plt.xlabel('time step')
-plt.title('Jr estimate over simulation')
-plt.show()
+    # plt.subplot(2, 1, 2)
+    # plt.plot(z_sim[1,0,:],label='True',color='k')
+    # plt.plot(xt_est_save[:,1,:].mean(axis=0), color=u'#1f77b4',label='mean')
+    # plt.fill_between(np.percentile(xt_est_save[:,1,:],97.5,axis=0),np.percentile(xt_est_save[:,1,:],2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+    # plt.plot(np.percentile(xt_est_save[:,1,:],97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
+    # plt.plot(np.percentile(xt_est_save[:,1,:],2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
+    # plt.axhline(-z_star[1,0], linestyle='--', color='g', linewidth=2, label='target')
+    # plt.ylabel('pendulum angle')
+    # plt.legend()
 
-ind = 2
-plt.plot(theta_est_save[:,ind,:].mean(axis=0),color='b',label='mean')
-plt.plot(np.percentile(theta_est_save[:,ind,:],97.5,axis=0),color='b',linestyle='--',label='95% CI')
-plt.plot(np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color='b',linestyle='--')
-plt.axhline(Km_true,color='k',label='True')
-plt.legend()
-plt.xlabel('time step')
-plt.title('Km estimate over simulation')
-plt.show()
+    # plt.show()
 
-ind = 3
-plt.plot(theta_est_save[:,ind,:].mean(axis=0),color='b',label='mean')
-plt.plot(np.percentile(theta_est_save[:,ind,:],97.5,axis=0),color='b',linestyle='--',label='95% CI')
-plt.plot(np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color='b',linestyle='--')
-plt.axhline(Rm_true,color='k',label='True')
-plt.legend()
-plt.xlabel('time step')
-plt.title('Rm estimate over simulation')
-plt.show()
+
+    ind = 0
+    plt.plot(ts,theta_est_save[:,ind,:].mean(axis=0),color=u'#1f77b4',label='Sample mean',linewidth=1)
+    plt.fill_between(ts,np.percentile(theta_est_save[:,ind,:],97.5,axis=0),np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+    plt.axhline(Jr_true,color='k',label='True value',linewidth=1,linestyle='--')
+    plt.legend()
+    plt.xlabel(r'Time (s)')
+    plt.xlim([0,49*0.025])
+    plt.title(r'$J_r$ estimate over simulation')
+    plt.savefig('stills/plot_'+str(ind)+'.png',format='png')
+    plt.close()
+
+    ind = 1
+    plt.plot(ts,theta_est_save[:,ind,:].mean(axis=0),color=u'#1f77b4',label='Sample mean',linewidth=1)
+    plt.fill_between(ts,np.percentile(theta_est_save[:,ind,:],97.5,axis=0),np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+    plt.axhline(Jp_true,color='k',label='True value',linewidth=1,linestyle='--')
+    plt.legend()
+    plt.xlabel(r'Time (s)')
+    plt.xlim([0,49*0.025])
+    plt.title(r'$J_p$ estimate over simulation')
+    plt.savefig('stills/plot_'+str(ind)+'.png',format='png')
+    plt.close()
+    # plt.show()
+
+    ind = 2
+    plt.plot(ts,theta_est_save[:,ind,:].mean(axis=0),color=u'#1f77b4',label='Sample mean',linewidth=1)
+    plt.fill_between(ts,np.percentile(theta_est_save[:,ind,:],97.5,axis=0),np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+    plt.axhline(Km_true,color='k',label='True value',linewidth=1,linestyle='--')
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.xlim([0,49*0.025])
+    plt.title(r'$K_m$ estimate over simulation')
+    plt.savefig('stills/plot_'+str(ind)+'.png',format='png')
+    plt.close()
+
+    ind = 3
+    plt.plot(ts,theta_est_save[:,ind,:].mean(axis=0),color=u'#1f77b4',label='Sample mean',linewidth=1)
+    plt.fill_between(ts,np.percentile(theta_est_save[:,ind,:],97.5,axis=0),np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+    plt.axhline(Rm_true,color='k',label='True value',linewidth=1,linestyle='--')
+    plt.legend()
+    plt.xlim([0,49*0.025])
+    plt.xlabel('time step')
+    plt.title(r'$R_m$ estimate over simulation')
+    plt.savefig('stills/plot_'+str(ind)+'.png',format='png')
+    plt.close()
+    # plt.show()
+
+    ind = 4
+    plt.plot(ts,theta_est_save[:,ind,:].mean(axis=0),color=u'#1f77b4',label='Sample mean',linewidth=1)
+    plt.fill_between(ts,np.percentile(theta_est_save[:,ind,:],97.5,axis=0),np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+    plt.axhline(Dp_true,color='k',label='True value',linewidth=1,linestyle='--')
+    plt.legend()
+    plt.xlim([0,49*0.025])
+    plt.xlabel('time step')
+    plt.title(r'$D_p$ estimate over simulation')
+    plt.savefig('stills/plot_'+str(ind)+'.png',format='png')
+    plt.close()
+
+    ind = 5
+    plt.plot(ts,theta_est_save[:,ind,:].mean(axis=0),color=u'#1f77b4',label='Sample mean',linewidth=1)
+    plt.fill_between(ts,np.percentile(theta_est_save[:,ind,:],97.5,axis=0),np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+    plt.axhline(Dr_true,color='k',label='True value',linewidth=1,linestyle='--')
+    plt.legend()
+    plt.xlim([0,49*0.025])
+    plt.xlabel('time step')
+    plt.title(r'$D_r$ estimate over simulation')
+    plt.savefig('stills/plot_'+str(ind)+'.png',format='png')
+    plt.close()
+    # plt.show()
 
 
 # from matplotlib import animation
@@ -303,8 +348,63 @@ plt.show()
 #                             'height_ratios':[2,1]})
 #
 # plt.show()
+
 t = 10
 pl = 0.5
+
+# TODO: data interpolation (linear)
+# super_fig = plt.figure()
+# axe = fig.gca(projection='3d')
+# plt.hist(x_mpc[1,:, 0], label='MC forward sim')
+mpc_n = 5
+q_mpc = q_est_save[:,:,mpc_n].T
+w_mpc2 = np.zeros((Nx,Ns,Nh+1),dtype=float)
+w_mpc2[0,:,:] = np.expand_dims(col_vec(q_mpc[0,:]) * np.random.randn(Ns, Nh+1), 0)  # uses the sampled stds, need to sample for x_t to x_{t+N+1}
+w_mpc2[1,:,:] = np.expand_dims(col_vec(q_mpc[1,:]) * np.random.randn(Ns, Nh+1), 0)
+w_mpc2[2,:,:] = np.expand_dims(col_vec(q_mpc[2,:]) * np.random.randn(Ns, Nh+1), 0)
+w_mpc2[3,:,:] = np.expand_dims(col_vec(q_mpc[3,:]) * np.random.randn(Ns, Nh+1), 0)
+uc = uc_save[[0],:,mpc_n]
+ut = u[[0],[mpc_n]]
+ut = np.expand_dims(ut,axis=1)
+uc = jnp.hstack([ut, uc])
+xt = xt_est_save[:,:,mpc_n].T
+theta = theta_est_save[:,:,mpc_n]
+# theta = theta.T
+Jr_samps = theta[:,0].squeeze()
+Jp_samps = theta[:,1].squeeze()
+Km_samps = theta[:,2].squeeze()
+Rm_samps = theta[:,3].squeeze()
+Dp_samps = theta[:,4].squeeze()
+Dr_samps = theta[:,5].squeeze()
+
+theta_mpc = {
+        'Mp': mp_true,
+        'Lp': Lp_true,
+        'Lr': Lr_true,
+        'Jr': Jr_samps,
+        'Jp': Jp_samps,
+        'Km': Km_samps,
+        'Rm': Rm_samps,
+        'Dp': Dp_samps,
+        'Dr': Dr_samps,
+        'g': grav,
+        'h': Ts
+}
+theta_mpc = fill_theta(theta_mpc)
+xtraj = sim(xt,uc,w_mpc2,theta_mpc)
+
+# add "actual" copnstraint violation 
+
+# compute as future
+
+
+
+axe = sns.kdeplot(data=xtraj[0,:,:], fill=True,alpha=.5,linewidth=0.2)
+axe.set_xlabel(r'Base arm angled (rad)')
+axe.axvline(-0.75*np.pi,color='r',linestyle='--',linewidth=0.75)
+plt.show()
+
+
 for t in range(T+15):
     fig, ax = plt.subplots(3,1,gridspec_kw={'width_ratios':[1],
                                             'height_ratios':[2,1,1]})
