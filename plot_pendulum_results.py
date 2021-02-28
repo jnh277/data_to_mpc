@@ -221,6 +221,7 @@ with open('results/'+run+'/uc_save100.pkl', 'rb') as file:
 plotme1 = True
 if plotme1:
     ts = np.arange(50)*0.025
+    tsx = np.arange(51)*0.025
     plt.plot(u[0,:])
     plt.title('MPC determined control action')
     plt.axhline(input_bound, linestyle='--', color='r', linewidth=2, label='constraint')
@@ -229,29 +230,217 @@ if plotme1:
     plt.close()
     # plt.show()
 
-    # plt.subplot(2, 1, 1)
-    # plt.plot(xt_est_save[:,0,:].mean(axis=0), color=u'#1f77b4',label='mean')
-    # plt.plot(z_sim[0,0,:],label='True',color='k')
-    # plt.fill_between(np.percentile(xt_est_save[:,0,:],97.5,axis=0),np.percentile(xt_est_save[:,0,:],2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
-    # plt.axhline(state_bound, linestyle='--', color='r', linewidth=2, label='constraint')
-    # plt.axhline(-state_bound, linestyle='--', color='r', linewidth=2)
-    # plt.ylabel('arm angle')
+    ## ! PLOT ANGLES AND CONTROL
+    fig = plt.figure(figsize=(6.4,7.2),dpi=300)
+    plt.subplot(3, 2, 1)
+    # plt.plot(ts,z_sim[0,0,:-1],label='True',linewidth = 2.0,color='k')
+    plt.plot(ts,xt_est_save[:,0,:].mean(axis=0), color=u'#1f77b4',linewidth = 1,label='State')
+    # plt.fill_between(ts,np.percentile(xt_est_save[:,0,:],99.0,axis=0),np.percentile(xt_est_save[:,0,:],1.0,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+    plt.axhline(state_bound, linestyle='--', color='r', linewidth=1.0, label='Constraints')
+    plt.axhline(-state_bound, linestyle='--', color='r', linewidth=1.0)
+    plt.xlim([0,49*0.025])
+    plt.ylabel('Base arm angle (rad)')
     # plt.legend()
 
+    plt.subplot(3, 2, 2)
+    # plt.plot(ts,z_sim[0,0,:-1],label='True',linewidth = 2.0,color='k')
+    err = xt_est_save[:,0,:]-z_sim[0,0,:-1]
+    plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
+    plt.plot(ts,err.mean(axis = 0), color=u'#1f77b4',linestyle='--',linewidth = 1,label='Mean of error')
+    plt.fill_between(ts,np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% interval')
 
-    # plt.subplot(2, 1, 2)
-    # plt.plot(z_sim[1,0,:],label='True',color='k')
-    # plt.plot(xt_est_save[:,1,:].mean(axis=0), color=u'#1f77b4',label='mean')
-    # plt.fill_between(np.percentile(xt_est_save[:,1,:],97.5,axis=0),np.percentile(xt_est_save[:,1,:],2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
-    # plt.plot(np.percentile(xt_est_save[:,1,:],97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-    # plt.plot(np.percentile(xt_est_save[:,1,:],2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-    # plt.axhline(-z_star[1,0], linestyle='--', color='g', linewidth=2, label='target')
-    # plt.ylabel('pendulum angle')
+    # plt.fill_between(ts,np.percentile(xt_est_save[:,0,:],99.0,axis=0),np.percentile(xt_est_save[:,0,:],1.0,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI') 
+    plt.xlim([0,49*0.025])
+    plt.ylabel('Base arm err. distribution (rad)')
+
+
+    plt.subplot(3, 2, 3)
+    # plt.plot(ts,z_im[1,0,:-1],label='True',linewidth = 2.0,color='k')
+    plt.plot(ts,xt_est_save[:,1,:].mean(axis=0), color=u'#1f77b4',linewidth = 1)
+    # plt.fill_between(ts,np.percentile(xt_est_save[:,1,:],99.0,axis=0),np.percentile(xt_est_save[:,1,:],1.0,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+    plt.axhline(-z_star[1,0], linestyle='--', color='g', linewidth=1.0, label='Target')
+    plt.xlim([0,49*0.025])
+    plt.ylabel('Pendulum angle (rad)')
+    # plt.xlabel('Time (s)')
+    # plt.legend(loc = 'upper right')
+
+    plt.subplot(3, 2, 4)
+    # plt.plot(ts,z_sim[1,0,:-1],label='True',linewidth = 2.0,color='k')
+    err = xt_est_save[:,1,:]-z_sim[1,0,:-1]
+    plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
+    plt.plot(ts,err.mean(axis = 0), color=u'#1f77b4',linestyle='--',linewidth = 1)
+    plt.fill_between(ts,np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15)
+    plt.xlim([0,49*0.025])
+    plt.ylabel('Pendulum err. distribution (rad)')
+    # plt.xlabel('Time (s)')
+    # plt.legend(loc = 'upper right')
+
+    plt.subplot(3, 2, 5)
+    plt.plot(tsx,u[0,:],color=u'#1f77b4',linewidth = 1)
+    # plt.title('MPC determined control action')
+    plt.axhline(input_bound, linestyle='--', color='r', linewidth=1.0)
+    plt.axhline(-input_bound, linestyle='--', color='r', linewidth=1.0)
+    plt.xlim([0,49*0.025])
+    plt.ylabel('Control action (V)')
+    plt.xlabel('Time (s)')
+
+    plt.subplot(3, 2, 6)
+    # plt.plot(ts,z_sim[1,0,:-1],label='True',linewidth = 2.0,color='k')
+    ener1 = 0.5*z_sim[2,0,:-1]*z_sim[2,0,:-1]*(mr_true*Lr_true*Lr_true + Jr_true)
+    ener2 = grav*mp_true*Lp_true*(1 - np.cos(z_sim[1,0,:-1])) + 0.5*z_sim[3,0,:-1]*z_sim[3,0,:-1]*(Jp_true+mp_true*Lp_true*Lp_true) + mp_true*Lr_true*Lp_true*np.cos(z_sim[1,0,:-1])*z_sim[3,0,:-1]*z_sim[2,0,:-1]
+    plt.plot(ts,ener1+ener2, color=u'#1f77b4',linewidth = 1)
+    plt.xlim([0,49*0.025])
+    plt.ylabel('Total system energy (J)')
+    plt.xlabel('Time (s)')
+    # plt.legend(loc = 'upper right')
+
+
+    plt.figlegend(loc='upper center',bbox_to_anchor=[0.5, 0.0666666], ncol=5)
+    plt.tight_layout(rect=[0,0.04666666,1,1])
+    plt.savefig('stills/plot_angles_and_control'+'.png',format='png')
+    plt.close()
+
+    ## ! PLOT ANGLES
+    fig = plt.figure(figsize=(6.4,4.8),dpi=300)
+    plt.subplot(2, 2, 1)
+    # plt.plot(ts,z_sim[0,0,:-1],label='True',linewidth = 2.0,color='k')
+    plt.plot(ts,xt_est_save[:,0,:].mean(axis=0), color=u'#1f77b4',linewidth = 1,label='State')
+    # plt.fill_between(ts,np.percentile(xt_est_save[:,0,:],99.0,axis=0),np.percentile(xt_est_save[:,0,:],1.0,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+    plt.axhline(state_bound, linestyle='--', color='r', linewidth=1.0, label='Constraints')
+    plt.axhline(-state_bound, linestyle='--', color='r', linewidth=1.0)
+    plt.xlim([0,49*0.025])
+    plt.ylabel('Base arm angle (rad)')
     # plt.legend()
 
-    # plt.show()
+    plt.subplot(2, 2, 2)
+    # plt.plot(ts,z_sim[0,0,:-1],label='True',linewidth = 2.0,color='k')
+    err = xt_est_save[:,0,:]-z_sim[0,0,:-1]
+    plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
+    plt.plot(ts,err.mean(axis = 0), color=u'#1f77b4',linestyle='--',linewidth = 1,label='Mean of error')
+    plt.fill_between(ts,np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% interval')
+
+    # plt.fill_between(ts,np.percentile(xt_est_save[:,0,:],99.0,axis=0),np.percentile(xt_est_save[:,0,:],1.0,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI') 
+    plt.xlim([0,49*0.025])
+    plt.ylabel('Base arm err. distribution (rad)')
 
 
+    plt.subplot(2, 2, 3)
+    # plt.plot(ts,z_im[1,0,:-1],label='True',linewidth = 2.0,color='k')
+    plt.plot(ts,xt_est_save[:,1,:].mean(axis=0), color=u'#1f77b4',linewidth = 1)
+    # plt.fill_between(ts,np.percentile(xt_est_save[:,1,:],99.0,axis=0),np.percentile(xt_est_save[:,1,:],1.0,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+    plt.axhline(-z_star[1,0], linestyle='--', color='g', linewidth=1.0, label='Target')
+    plt.xlim([0,49*0.025])
+    plt.ylabel('Pendulum angle (rad)')
+    plt.xlabel('Time (s)')
+    # plt.legend(loc = 'upper right')
+
+    plt.subplot(2, 2, 4)
+    # plt.plot(ts,z_sim[1,0,:-1],label='True',linewidth = 2.0,color='k')
+    err = xt_est_save[:,1,:]-z_sim[1,0,:-1]
+    plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
+    plt.plot(ts,err.mean(axis = 0), color=u'#1f77b4',linestyle='--',linewidth = 1)
+    plt.fill_between(ts,np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15)
+    plt.xlim([0,49*0.025])
+    plt.ylabel('Pendulum err. distribution (rad)')
+    plt.xlabel('Time (s)')
+    # plt.legend(loc = 'upper right')
+    plt.figlegend(loc='upper center',bbox_to_anchor=[0.5, 0.1], ncol=5)
+    plt.tight_layout(rect=[0,0.07,1,1])
+    plt.savefig('stills/plot_angles'+'.png',format='png')
+    plt.close()
+
+    ## ! FULL STATE
+    fig = plt.figure(figsize=(6.4,9.6),dpi=300)
+    plt.subplot(4, 2, 1)
+    # plt.plot(ts,z_sim[0,0,:-1],label='True',linewidth = 2.0,color='k')
+    plt.plot(ts,xt_est_save[:,0,:].mean(axis=0), color=u'#1f77b4',linewidth = 1,label='State')
+    # plt.fill_between(ts,np.percentile(xt_est_save[:,0,:],99.0,axis=0),np.percentile(xt_est_save[:,0,:],1.0,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+    plt.axhline(state_bound, linestyle='--', color='r', linewidth=1.0, label='Constraints')
+    plt.axhline(-state_bound, linestyle='--', color='r', linewidth=1.0)
+    plt.xlim([0,49*0.025])
+    plt.ylabel('Base arm angle (rad)')
+    # plt.legend()
+
+    plt.subplot(4, 2, 2)
+    # plt.plot(ts,z_sim[0,0,:-1],label='True',linewidth = 2.0,color='k')
+    err = xt_est_save[:,0,:]-z_sim[0,0,:-1]
+    plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
+    plt.plot(ts,err.mean(axis = 0), color=u'#1f77b4',linestyle='--',linewidth = 1,label='Mean of error')
+    plt.fill_between(ts,np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% interval')
+
+    # plt.fill_between(ts,np.percentile(xt_est_save[:,0,:],99.0,axis=0),np.percentile(xt_est_save[:,0,:],1.0,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI') 
+    plt.xlim([0,49*0.025])
+    plt.ylabel('Base arm err. distrbution (rad)')
+
+    plt.subplot(4, 2, 3)
+    # plt.plot(ts,z_sim[0,0,:-1],label='True',linewidth = 2.0,color='k')
+    plt.plot(ts,xt_est_save[:,2,:].mean(axis=0), color=u'#1f77b4',linewidth = 1)
+    # plt.fill_between(ts,np.percentile(xt_est_save[:,0,:],99.0,axis=0),np.percentile(xt_est_save[:,0,:],1.0,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+    # plt.axhline(state_bound, linestyle='--', color='r', linewidth=1.0, label='Constraints')
+    # plt.axhline(-state_bound, linestyle='--', color='r', linewidth=1.0)
+    plt.xlim([0,49*0.025])
+    plt.ylabel('Base arm velocity (rad/s)')
+    # plt.legend()
+
+    plt.subplot(4, 2, 4)
+    # plt.plot(ts,z_sim[0,0,:-1],label='True',linewidth = 2.0,color='k')
+    err = xt_est_save[:,2,:]-z_sim[2,0,:-1]
+    plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
+    plt.plot(ts,err.mean(axis = 0), color=u'#1f77b4',linestyle='--',linewidth = 1)
+    plt.fill_between(ts,np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15)
+
+    # plt.fill_between(ts,np.percentile(xt_est_save[:,0,:],99.0,axis=0),np.percentile(xt_est_save[:,0,:],1.0,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI') 
+    plt.xlim([0,49*0.025])
+    plt.ylabel('Base arm velocity err. distrbution (rad/s)')
+
+
+    plt.subplot(4, 2, 5)
+    # plt.plot(ts,z_im[1,0,:-1],label='True',linewidth = 2.0,color='k')
+    plt.plot(ts,xt_est_save[:,1,:].mean(axis=0), color=u'#1f77b4',linewidth = 1)
+    # plt.fill_between(ts,np.percentile(xt_est_save[:,1,:],99.0,axis=0),np.percentile(xt_est_save[:,1,:],1.0,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+    plt.axhline(-z_star[1,0], linestyle='--', color='g', linewidth=1.0, label='Target')
+    plt.xlim([0,49*0.025])
+    plt.ylabel('Pendulum angle (rad)')
+    plt.xlabel('Time (s)')
+    # plt.legend(loc = 'upper right')
+
+    plt.subplot(4, 2, 6)
+    # plt.plot(ts,z_sim[1,0,:-1],label='True',linewidth = 2.0,color='k')
+    err = xt_est_save[:,1,:]-z_sim[1,0,:-1]
+    plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
+    plt.plot(ts,err.mean(axis = 0), color=u'#1f77b4',linestyle='--',linewidth = 1)
+    plt.fill_between(ts,np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15)
+    plt.xlim([0,49*0.025])
+    plt.ylabel('Pendulum err. distribution (rad)')
+    plt.xlabel('Time (s)')
+    # plt.legend(loc = 'upper right')
+
+    plt.subplot(4, 2, 7)
+    # plt.plot(ts,z_im[1,0,:-1],label='True',linewidth = 2.0,color='k')
+    plt.plot(ts,xt_est_save[:,3,:].mean(axis=0), color=u'#1f77b4',linewidth = 1)
+    # plt.fill_between(ts,np.percentile(xt_est_save[:,1,:],99.0,axis=0),np.percentile(xt_est_save[:,1,:],1.0,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+    # plt.axhline(-z_star[1,0], linestyle='--', color='g', linewidth=1.0, label='Target')
+    plt.xlim([0,49*0.025])
+    plt.ylabel('Pendulum velocity (rad/s)')
+    plt.xlabel('Time (s)')
+    # plt.legend(loc = 'upper right')
+
+    plt.subplot(4, 2, 8)
+    # plt.plot(ts,z_sim[1,0,:-1],label='True',linewidth = 2.0,color='k')
+    err = xt_est_save[:,3,:]-z_sim[3,0,:-1]
+    plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
+    plt.plot(ts,err.mean(axis = 0), color=u'#1f77b4',linestyle='--',linewidth = 1)
+    plt.fill_between(ts,np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15)
+    plt.xlim([0,49*0.025])
+    plt.ylabel('Pendulum velocity err. distribution (rad/s)')
+    plt.xlabel('Time (s)')
+    # plt.legend(loc = 'upper right')
+    plt.figlegend(loc='upper center',bbox_to_anchor=[0.5, 0.05], ncol=5)
+    plt.tight_layout(rect=[0,0.035,1,1])
+    plt.savefig('stills/plot_states'+'.png',format='png')
+    plt.close()
+
+    ## ! PARAMS
     ind = 0
     plt.plot(ts,theta_est_save[:,ind,:].mean(axis=0),color=u'#1f77b4',label='Sample mean',linewidth=1)
     plt.fill_between(ts,np.percentile(theta_est_save[:,ind,:],97.5,axis=0),np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
@@ -265,7 +454,7 @@ if plotme1:
 
     ind = 1
     plt.plot(ts,theta_est_save[:,ind,:].mean(axis=0),color=u'#1f77b4',label='Sample mean',linewidth=1)
-    plt.fill_between(ts,np.percentile(theta_est_save[:,ind,:],97.5,axis=0),np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+    plt.fill_between(ts,np.percentile(theta_est_save[:,ind,:],97.5,axis=0),np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color=u'#1f77b4',alpha=0.15)
     plt.axhline(Jp_true,color='k',label='True value',linewidth=1,linestyle='--')
     plt.legend()
     plt.ticklabel_format(style='sci',axis='y',scilimits=(0,0))
@@ -324,6 +513,8 @@ if plotme1:
     plt.close()
     # plt.show()
 
+    # ! PARAM 
+    fig = plt.figure(figsize=(6.4,4.8),dpi=300)
     plt.subplot(3, 1, 1)
     ind = 1
     plt.fill_between(ts,np.percentile(theta_est_save[:,ind,:],97.5,axis=0),np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color=u'#DDEBF4',label='95% CI')
@@ -357,11 +548,12 @@ if plotme1:
     plt.xlabel('Time (s)')
     # plt.title(r'$D_r$ estimate over simulation')
     plt.tight_layout()
-    plt.savefig('stills/subplot_params.eps',format='eps')
+    plt.savefig('stills/subplot_params.png',format='png')
     plt.close()
 
-    # SIX FIGURE SUBPLOT
-    plt.subplot(3, 2, 1)
+    # ! SIX FIGURE SUBPLOT
+    fig = plt.figure(figsize=(6.4,4.8),dpi=300)
+    plt.subplot(3, 2, 2)
     ind = 1
     l3 = plt.fill_between(ts,np.percentile(theta_est_save[:,ind,:],97.5,axis=0),np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color=u'#DDEBF4',label='95% CI')
     l2 = plt.axhline(Jp_true,color='k',label='True value',linewidth=1,linestyle='--')
@@ -371,9 +563,9 @@ if plotme1:
     # plt.xlabel(r'Time (s)')
     plt.ylabel(r'$J_p$ ($kg/m^2$)')
     plt.xlim([0,25*0.025])
-    plt.suptitle(r'Parameter estimates over simulation')
+    # plt.suptitle(r'Parameter estimates over simulation')
 
-    plt.subplot(3, 2, 2)
+    plt.subplot(3, 2, 1)
     ind = 0
     plt.fill_between(ts,np.percentile(theta_est_save[:,ind,:],97.5,axis=0),np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color=u'#DDEBF4',label='95% CI')
     plt.axhline(Jr_true,color='k',label='True value',linewidth=1,linestyle='--')
@@ -429,10 +621,9 @@ if plotme1:
     plt.ylabel(r'$D_p$ ($Nms/rad$)')
     plt.xlabel('Time (s)')
 
-
-    plt.tight_layout()
-    lgd = plt.figlegend(('Sample mean','True value','95% CI'),loc='upper right',ncol=1)
-    plt.savefig('stills/subplot_params_six.eps',bbox_extra_artists=(lgd,),format='eps')
+    plt.tight_layout(rect=[0,0.07,1,1])
+    plt.figlegend(('True value','Sample mean','95% CI'),loc='upper center',bbox_to_anchor=[0.5, 0.1], ncol=3)
+    plt.savefig('stills/subplot_params_six.png',format='png')
     plt.close()
 
 # from matplotlib import animation
@@ -462,60 +653,60 @@ if plotme1:
 #
 # plt.show()
 
-t = 10
-pl = 0.5
+# t = 10
+# pl = 0.5
 
-# TODO: data interpolation (linear)
-# super_fig = plt.figure()
-# axe = fig.gca(projection='3d')
-# plt.hist(x_mpc[1,:, 0], label='MC forward sim')
-mpc_n = 5
-q_mpc = q_est_save[:,:,mpc_n].T
-w_mpc2 = np.zeros((Nx,Ns,Nh+1),dtype=float)
-w_mpc2[0,:,:] = np.expand_dims(col_vec(q_mpc[0,:]) * np.random.randn(Ns, Nh+1), 0)  # uses the sampled stds, need to sample for x_t to x_{t+N+1}
-w_mpc2[1,:,:] = np.expand_dims(col_vec(q_mpc[1,:]) * np.random.randn(Ns, Nh+1), 0)
-w_mpc2[2,:,:] = np.expand_dims(col_vec(q_mpc[2,:]) * np.random.randn(Ns, Nh+1), 0)
-w_mpc2[3,:,:] = np.expand_dims(col_vec(q_mpc[3,:]) * np.random.randn(Ns, Nh+1), 0)
-uc = uc_save[[0],:,mpc_n]
-ut = u[[0],[mpc_n]]
-ut = np.expand_dims(ut,axis=1)
-uc = jnp.hstack([ut, uc])
-xt = xt_est_save[:,:,mpc_n].T
-theta = theta_est_save[:,:,mpc_n]
-# theta = theta.T
-Jr_samps = theta[:,0].squeeze()
-Jp_samps = theta[:,1].squeeze()
-Km_samps = theta[:,2].squeeze()
-Rm_samps = theta[:,3].squeeze()
-Dp_samps = theta[:,4].squeeze()
-Dr_samps = theta[:,5].squeeze()
+# # TODO: data interpolation (linear)
+# # super_fig = plt.figure()
+# # axe = fig.gca(projection='3d')
+# # plt.hist(x_mpc[1,:, 0], label='MC forward sim')
+# mpc_n = 5
+# q_mpc = q_est_save[:,:,mpc_n].T
+# w_mpc2 = np.zeros((Nx,Ns,Nh+1),dtype=float)
+# w_mpc2[0,:,:] = np.expand_dims(col_vec(q_mpc[0,:]) * np.random.randn(Ns, Nh+1), 0)  # uses the sampled stds, need to sample for x_t to x_{t+N+1}
+# w_mpc2[1,:,:] = np.expand_dims(col_vec(q_mpc[1,:]) * np.random.randn(Ns, Nh+1), 0)
+# w_mpc2[2,:,:] = np.expand_dims(col_vec(q_mpc[2,:]) * np.random.randn(Ns, Nh+1), 0)
+# w_mpc2[3,:,:] = np.expand_dims(col_vec(q_mpc[3,:]) * np.random.randn(Ns, Nh+1), 0)
+# uc = uc_save[[0],:,mpc_n]
+# ut = u[[0],[mpc_n]]
+# ut = np.expand_dims(ut,axis=1)
+# uc = jnp.hstack([ut, uc])
+# xt = xt_est_save[:,:,mpc_n].T
+# theta = theta_est_save[:,:,mpc_n]
+# # theta = theta.T
+# Jr_samps = theta[:,0].squeeze()
+# Jp_samps = theta[:,1].squeeze()
+# Km_samps = theta[:,2].squeeze()
+# Rm_samps = theta[:,3].squeeze()
+# Dp_samps = theta[:,4].squeeze()
+# Dr_samps = theta[:,5].squeeze()
 
-theta_mpc = {
-        'Mp': mp_true,
-        'Lp': Lp_true,
-        'Lr': Lr_true,
-        'Jr': Jr_samps,
-        'Jp': Jp_samps,
-        'Km': Km_samps,
-        'Rm': Rm_samps,
-        'Dp': Dp_samps,
-        'Dr': Dr_samps,
-        'g': grav,
-        'h': Ts
-}
-theta_mpc = fill_theta(theta_mpc)
-xtraj = sim(xt,uc,w_mpc2,theta_mpc)
+# theta_mpc = {
+#         'Mp': mp_true,
+#         'Lp': Lp_true,
+#         'Lr': Lr_true,
+#         'Jr': Jr_samps,
+#         'Jp': Jp_samps,
+#         'Km': Km_samps,
+#         'Rm': Rm_samps,
+#         'Dp': Dp_samps,
+#         'Dr': Dr_samps,
+#         'g': grav,
+#         'h': Ts
+# }
+# theta_mpc = fill_theta(theta_mpc)
+# xtraj = sim(xt,uc,w_mpc2,theta_mpc)
 
-# add "actual" copnstraint violation 
+# # add "actual" copnstraint violation 
 
-# compute as future
+# # compute as future
 
 
 
-axe = sns.kdeplot(data=xtraj[0,:,:], fill=True,alpha=.5,linewidth=0.2)
-axe.set_xlabel(r'Base arm angled (rad)')
-axe.axvline(-0.75*np.pi,color='r',linestyle='--',linewidth=0.75)
-plt.show()
+# axe = sns.kdeplot(data=xtraj[0,:,:], fill=True,alpha=.5,linewidth=0.2)
+# axe.set_xlabel(r'Base arm angled (rad)')
+# axe.axvline(-0.75*np.pi,color='r',linestyle='--',linewidth=0.75)
+# plt.show()
 
 
 for t in range(T+15):
