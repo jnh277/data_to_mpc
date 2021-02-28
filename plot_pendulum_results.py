@@ -230,7 +230,7 @@ if plotme1:
     plt.close()
     # plt.show()
 
-    ## PLOT ANGLES
+    ## ! PLOT ANGLES
     plt.subplot(2, 2, 1)
     # plt.plot(ts,z_sim[0,0,:-1],label='True',linewidth = 2.0,color='k')
     plt.plot(ts,xt_est_save[:,0,:].mean(axis=0), color=u'#1f77b4',linewidth = 1,label='State')
@@ -268,18 +268,18 @@ if plotme1:
     err = xt_est_save[:,1,:]-z_sim[1,0,:-1]
     plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
     plt.plot(ts,err.mean(axis = 0), color=u'#1f77b4',linestyle='--',linewidth = 1)
-    plt.fill_between(ts,np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% interval')
+    plt.fill_between(ts,np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15)
     plt.xlim([0,49*0.025])
     plt.ylabel('Pendulum err. distribution (rad)')
     plt.xlabel('Time (s)')
     # plt.legend(loc = 'upper right')
-    plt.figlegend(loc='upper right')
+    plt.figlegend(loc='upper center',bbox_to_anchor=[0.5, 0.1], ncol=5)
 
-    plt.tight_layout()
+    plt.tight_layout(rect=[0,0.07,1,1])
     plt.savefig('stills/plot_angles'+'.png',format='png')
     plt.close()
 
-    ## FULL STATE
+    ## ! FULL STATE
     fig = plt.figure(figsize=(6.4,9.6))
     plt.subplot(4, 2, 1)
     # plt.plot(ts,z_sim[0,0,:-1],label='True',linewidth = 2.0,color='k')
@@ -372,7 +372,7 @@ if plotme1:
     plt.savefig('stills/plot_states'+'.png',format='png')
     plt.close()
 
-    ## PARAMS
+    ## ! PARAMS
     ind = 0
     plt.plot(ts,theta_est_save[:,ind,:].mean(axis=0),color=u'#1f77b4',label='Sample mean',linewidth=1)
     plt.fill_between(ts,np.percentile(theta_est_save[:,ind,:],97.5,axis=0),np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
