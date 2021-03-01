@@ -234,7 +234,7 @@ if plotme1:
     fig = plt.figure(figsize=(6.4,7.2),dpi=300)
     plt.subplot(3, 2, 1)
     # plt.plot(ts,z_sim[0,0,:-1],label='True',linewidth = 2.0,color='k')
-    plt.plot(ts,xt_est_save[:,0,:].mean(axis=0), color=u'#1f77b4',linewidth = 1,label='State')
+    plt.plot(ts,xt_est_save[:,0,:].mean(axis=0), color=u'#1f77b4',linewidth = 1,label='True')
     # plt.fill_between(ts,np.percentile(xt_est_save[:,0,:],99.0,axis=0),np.percentile(xt_est_save[:,0,:],1.0,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
     plt.axhline(state_bound, linestyle='--', color='r', linewidth=1.0, label='Constraints')
     plt.axhline(-state_bound, linestyle='--', color='r', linewidth=1.0)
@@ -245,13 +245,13 @@ if plotme1:
     plt.subplot(3, 2, 2)
     # plt.plot(ts,z_sim[0,0,:-1],label='True',linewidth = 2.0,color='k')
     err = xt_est_save[:,0,:]-z_sim[0,0,:-1]
-    plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
+    # plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
     plt.plot(ts,err.mean(axis = 0), color=u'#1f77b4',linestyle='--',linewidth = 1,label='Mean of error')
     plt.fill_between(ts,np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% interval')
-
+    plt.ticklabel_format(style='sci',axis='y',scilimits=(0,0))
     # plt.fill_between(ts,np.percentile(xt_est_save[:,0,:],99.0,axis=0),np.percentile(xt_est_save[:,0,:],1.0,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI') 
     plt.xlim([0,49*0.025])
-    plt.ylabel('Base arm err. distribution (rad)')
+    plt.ylabel('Base arm err. distr. (rad)')
 
 
     plt.subplot(3, 2, 3)
@@ -267,11 +267,12 @@ if plotme1:
     plt.subplot(3, 2, 4)
     # plt.plot(ts,z_sim[1,0,:-1],label='True',linewidth = 2.0,color='k')
     err = xt_est_save[:,1,:]-z_sim[1,0,:-1]
-    plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
+    # plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
     plt.plot(ts,err.mean(axis = 0), color=u'#1f77b4',linestyle='--',linewidth = 1)
     plt.fill_between(ts,np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15)
     plt.xlim([0,49*0.025])
-    plt.ylabel('Pendulum err. distribution (rad)')
+    plt.ticklabel_format(style='sci',axis='y',scilimits=(0,0))
+    plt.ylabel('Pendulum err. distr. (rad)')
     # plt.xlabel('Time (s)')
     # plt.legend(loc = 'upper right')
 
@@ -289,6 +290,7 @@ if plotme1:
     ener1 = 0.5*z_sim[2,0,:-1]*z_sim[2,0,:-1]*(mr_true*Lr_true*Lr_true + Jr_true)
     ener2 = grav*mp_true*Lp_true*(1 - np.cos(z_sim[1,0,:-1])) + 0.5*z_sim[3,0,:-1]*z_sim[3,0,:-1]*(Jp_true+mp_true*Lp_true*Lp_true) + mp_true*Lr_true*Lp_true*np.cos(z_sim[1,0,:-1])*z_sim[3,0,:-1]*z_sim[2,0,:-1]
     plt.plot(ts,ener1+ener2, color=u'#1f77b4',linewidth = 1)
+    plt.ticklabel_format(style='sci',axis='y',scilimits=(0,0))
     plt.xlim([0,49*0.025])
     plt.ylabel('Total system energy (J)')
     plt.xlabel('Time (s)')
@@ -304,7 +306,7 @@ if plotme1:
     fig = plt.figure(figsize=(6.4,4.8),dpi=300)
     plt.subplot(2, 2, 1)
     # plt.plot(ts,z_sim[0,0,:-1],label='True',linewidth = 2.0,color='k')
-    plt.plot(ts,xt_est_save[:,0,:].mean(axis=0), color=u'#1f77b4',linewidth = 1,label='State')
+    plt.plot(ts,xt_est_save[:,0,:].mean(axis=0), color=u'#1f77b4',linewidth = 1,label='True')
     # plt.fill_between(ts,np.percentile(xt_est_save[:,0,:],99.0,axis=0),np.percentile(xt_est_save[:,0,:],1.0,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
     plt.axhline(state_bound, linestyle='--', color='r', linewidth=1.0, label='Constraints')
     plt.axhline(-state_bound, linestyle='--', color='r', linewidth=1.0)
@@ -315,13 +317,13 @@ if plotme1:
     plt.subplot(2, 2, 2)
     # plt.plot(ts,z_sim[0,0,:-1],label='True',linewidth = 2.0,color='k')
     err = xt_est_save[:,0,:]-z_sim[0,0,:-1]
-    plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
+    # plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
     plt.plot(ts,err.mean(axis = 0), color=u'#1f77b4',linestyle='--',linewidth = 1,label='Mean of error')
     plt.fill_between(ts,np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% interval')
-
+    plt.ticklabel_format(style='sci',axis='y',scilimits=(0,0))
     # plt.fill_between(ts,np.percentile(xt_est_save[:,0,:],99.0,axis=0),np.percentile(xt_est_save[:,0,:],1.0,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI') 
     plt.xlim([0,49*0.025])
-    plt.ylabel('Base arm err. distribution (rad)')
+    plt.ylabel('Base arm err. distr. (rad)')
 
 
     plt.subplot(2, 2, 3)
@@ -337,11 +339,12 @@ if plotme1:
     plt.subplot(2, 2, 4)
     # plt.plot(ts,z_sim[1,0,:-1],label='True',linewidth = 2.0,color='k')
     err = xt_est_save[:,1,:]-z_sim[1,0,:-1]
-    plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
+    # plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
     plt.plot(ts,err.mean(axis = 0), color=u'#1f77b4',linestyle='--',linewidth = 1)
     plt.fill_between(ts,np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15)
     plt.xlim([0,49*0.025])
-    plt.ylabel('Pendulum err. distribution (rad)')
+    plt.ticklabel_format(style='sci',axis='y',scilimits=(0,0))
+    plt.ylabel('Pendulum err. distr. (rad)')
     plt.xlabel('Time (s)')
     # plt.legend(loc = 'upper right')
     plt.figlegend(loc='upper center',bbox_to_anchor=[0.5, 0.1], ncol=5)
@@ -364,13 +367,13 @@ if plotme1:
     plt.subplot(4, 2, 2)
     # plt.plot(ts,z_sim[0,0,:-1],label='True',linewidth = 2.0,color='k')
     err = xt_est_save[:,0,:]-z_sim[0,0,:-1]
-    plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
+    # plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
     plt.plot(ts,err.mean(axis = 0), color=u'#1f77b4',linestyle='--',linewidth = 1,label='Mean of error')
     plt.fill_between(ts,np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% interval')
-
+    plt.ticklabel_format(style='sci',axis='y',scilimits=(0,0))
     # plt.fill_between(ts,np.percentile(xt_est_save[:,0,:],99.0,axis=0),np.percentile(xt_est_save[:,0,:],1.0,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI') 
     plt.xlim([0,49*0.025])
-    plt.ylabel('Base arm err. distrbution (rad)')
+    plt.ylabel('Base arm err. distr. (rad)')
 
     plt.subplot(4, 2, 3)
     # plt.plot(ts,z_sim[0,0,:-1],label='True',linewidth = 2.0,color='k')
@@ -384,14 +387,14 @@ if plotme1:
 
     plt.subplot(4, 2, 4)
     # plt.plot(ts,z_sim[0,0,:-1],label='True',linewidth = 2.0,color='k')
-    err = xt_est_save[:,2,:]-z_sim[2,0,:-1]
-    plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
-    plt.plot(ts,err.mean(axis = 0), color=u'#1f77b4',linestyle='--',linewidth = 1)
-    plt.fill_between(ts,np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15)
-
+    err = xt_est_save[:,2,1:]-z_sim[2,0,1:-1]
+    # plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
+    plt.plot(ts[1:],err.mean(axis = 0), color=u'#1f77b4',linestyle='--',linewidth = 1)
+    plt.fill_between(ts[1:],np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15)
+    plt.ticklabel_format(style='sci',axis='y',scilimits=(0,0))
     # plt.fill_between(ts,np.percentile(xt_est_save[:,0,:],99.0,axis=0),np.percentile(xt_est_save[:,0,:],1.0,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI') 
     plt.xlim([0,49*0.025])
-    plt.ylabel('Base arm velocity err. distrbution (rad/s)')
+    plt.ylabel('Base arm velocity err. distr. (rad/s)')
 
 
     plt.subplot(4, 2, 5)
@@ -407,11 +410,12 @@ if plotme1:
     plt.subplot(4, 2, 6)
     # plt.plot(ts,z_sim[1,0,:-1],label='True',linewidth = 2.0,color='k')
     err = xt_est_save[:,1,:]-z_sim[1,0,:-1]
-    plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
+    # plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
     plt.plot(ts,err.mean(axis = 0), color=u'#1f77b4',linestyle='--',linewidth = 1)
     plt.fill_between(ts,np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15)
     plt.xlim([0,49*0.025])
-    plt.ylabel('Pendulum err. distribution (rad)')
+    plt.ticklabel_format(style='sci',axis='y',scilimits=(0,0))
+    plt.ylabel('Pendulum err. distr. (rad)')
     plt.xlabel('Time (s)')
     # plt.legend(loc = 'upper right')
 
@@ -427,12 +431,13 @@ if plotme1:
 
     plt.subplot(4, 2, 8)
     # plt.plot(ts,z_sim[1,0,:-1],label='True',linewidth = 2.0,color='k')
-    err = xt_est_save[:,3,:]-z_sim[3,0,:-1]
-    plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
-    plt.plot(ts,err.mean(axis = 0), color=u'#1f77b4',linestyle='--',linewidth = 1)
-    plt.fill_between(ts,np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15)
+    err = xt_est_save[:,3,1:]-z_sim[3,0,1:-1]
+    # plt.axhline(0.0, linestyle='--', color='g', linewidth=1.0)
+    plt.plot(ts[1:],err.mean(axis = 0), color=u'#1f77b4',linestyle='--',linewidth = 1)
+    plt.fill_between(ts[1:],np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15)
     plt.xlim([0,49*0.025])
-    plt.ylabel('Pendulum velocity err. distribution (rad/s)')
+    plt.ticklabel_format(style='sci',axis='y',scilimits=(0,0))
+    plt.ylabel('Pendulum velocity err. distr. (rad/s)')
     plt.xlabel('Time (s)')
     # plt.legend(loc = 'upper right')
     plt.figlegend(loc='upper center',bbox_to_anchor=[0.5, 0.05], ncol=5)
