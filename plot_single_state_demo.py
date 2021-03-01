@@ -123,7 +123,7 @@ with open('results/'+run+'/mpc_result_save100.pkl', 'rb') as file:
     mpc_result_save = pickle.load(file)
 
 
-fontsize=14
+fontsize=12
 plt.subplot(2,1,1)
 #print(plt.rcParams['axes.prop_cycle'].by_key()['color'])
 plt.fill_between(np.arange(T),np.percentile(xt_est_save[0,:,:],97.5,axis=0),np.percentile(xt_est_save[0,:,:],2.5,axis=0),alpha=0.2,label='95% CI',color=u'#1f77b4')
@@ -135,61 +135,68 @@ plt.ylabel('x', fontsize=fontsize)
 plt.xticks([])
 plt.axhline(x_ub,linestyle='--',color='r',linewidth=2.,label='constraint')
 plt.axhline(x_star,linestyle='--',color='g',linewidth=2.,label='target')
-plt.legend(fontsize=12)
+# plt.legend(fontsize=12)
 
 plt.subplot(2,1,2)
 plt.plot(u,linewidth=2., color='k')
-plt.axhline(u_ub,linestyle='--',color='r',linewidth=2.,label='constraint')
+plt.axhline(u_ub,linestyle='--',color='r',linewidth=2.)
 plt.ylabel('u', fontsize=fontsize)
 plt.xlabel(r'$t$', fontsize=fontsize)
+# plt.subplots_adjust(bottom=0.5)
+plt.figlegend(loc='upper center',bbox_to_anchor=[0.55, 0.05], ncol=5)
+plt.tight_layout(rect=[0.0,0.1,1,1])
 
-plt.tight_layout()
+
 plt.show()
 
 plt.subplot(2,2,1)
-plt.plot(a_est_save.mean(axis=0),linewidth=2,label='mean')
-plt.fill_between(np.arange(T),np.percentile(a_est_save,97.5,axis=0),np.percentile(a_est_save,2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+plt.plot(a_est_save.mean(axis=0),linewidth=2)
+plt.fill_between(np.arange(T),np.percentile(a_est_save,97.5,axis=0),np.percentile(a_est_save,2.5,axis=0),color=u'#1f77b4',alpha=0.15)
 # plt.plot(np.percentile(a_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
 # plt.plot(np.percentile(a_est_save,2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
 plt.ylabel(r'$a$', fontsize=fontsize)
-plt.axhline(0.9,linestyle='--',color='k',linewidth=2.,label='true')
+plt.axhline(0.9,linestyle='--',color='k',linewidth=2.)
 
 # plt.xlabel(r'$t$')
 plt.xticks([])
 
 plt.subplot(2,2,2)
-plt.plot(b_est_save.mean(axis=0),linewidth=2,label='mean')
+plt.plot(b_est_save.mean(axis=0),linewidth=2,label='Mean')
 plt.fill_between(np.arange(T),np.percentile(b_est_save,97.5,axis=0),np.percentile(b_est_save,2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
 # plt.plot(np.percentile(b_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
 # plt.plot(np.percentile(b_est_save,2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
 plt.ylabel(r'$b$',fontsize=fontsize)
-plt.axhline(0.1,linestyle='--',color='k',linewidth=2.,label='true')
-plt.legend(fontsize=12,bbox_to_anchor=(1.15, 1.15))
+plt.axhline(0.1,linestyle='--',color='k',linewidth=2.,label='True')
+# plt.legend(fontsize=12,bbox_to_anchor=(1.15, 1.15))
 
 # plt.xlabel(r'$t$')
 plt.xticks([])
 
 plt.subplot(2,2,3)
-plt.plot(q_est_save.mean(axis=0),linewidth=2,label='mean')
-plt.fill_between(np.arange(T),np.percentile(q_est_save,97.5,axis=0),np.percentile(q_est_save,2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+plt.plot(q_est_save.mean(axis=0),linewidth=2)
+plt.fill_between(np.arange(T),np.percentile(q_est_save,97.5,axis=0),np.percentile(q_est_save,2.5,axis=0),color=u'#1f77b4',alpha=0.15)
 # plt.plot(np.percentile(q_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
 # plt.plot(np.percentile(q_est_save,2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
 plt.ylabel(r'$q$',fontsize=fontsize)
-plt.axhline(q_true,linestyle='--',color='k',linewidth=2.,label='true')
+plt.axhline(q_true,linestyle='--',color='k',linewidth=2.)
 # plt.legend()
 plt.xlabel(r'$t$',fontsize=fontsize)
 
 plt.subplot(2,2,4)
-plt.plot(r_est_save.mean(axis=0),linewidth=2,label='mean')
-plt.fill_between(np.arange(T),np.percentile(r_est_save,97.5,axis=0),np.percentile(r_est_save,2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% CI')
+plt.plot(r_est_save.mean(axis=0),linewidth=2)
+plt.fill_between(np.arange(T),np.percentile(r_est_save,97.5,axis=0),np.percentile(r_est_save,2.5,axis=0),color=u'#1f77b4',alpha=0.15)
 # plt.plot(np.percentile(r_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
 # plt.plot(np.percentile(r_est_save,2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
 plt.ylabel(r'$r$',fontsize=fontsize)
-plt.axhline(r_true,linestyle='--',color='k',linewidth=2.,label='true')
+plt.axhline(r_true,linestyle='--',color='k',linewidth=2.)
 # plt.legend()
 plt.xlabel(r'$t$',fontsize=fontsize)
 
-plt.tight_layout()
+
+# plt.figlegend(loc='upper center',bbox_to_anchor=[0.5, 0.1],ncol=3)
+# plt.tight_layout(rect=[0,0.1,1,1])
+plt.figlegend(loc='upper center',bbox_to_anchor=[0.54, 0.0566666], ncol=5)
+plt.tight_layout(rect=[0,0.06666666,1,1])
 plt.show()
 
 
