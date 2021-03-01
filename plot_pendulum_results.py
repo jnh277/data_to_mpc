@@ -287,7 +287,8 @@ if plotme1:
 
     plt.subplot(3, 2, 6)
     # plt.plot(ts,z_sim[1,0,:-1],label='True',linewidth = 2.0,color='k')
-    kin_pend = 0.5*z_sim[3,0,:-1]*z_sim[3,0,:-1]*(Jp_true+mp_true*Lp_true*Lp_true) + mp_true*Lr_true*Lp_true*np.cos(z_sim[1,0,:-1])*z_sim[3,0,:-1]*z_sim[2,0,:-1]
+    kin_pend = 0.5*z_sim[2,0,:-1]*z_sim[2,0,:-1]*(mp_true*Lp_true*Lp_true + (mp_true*Lp_true*Lp_true+Jp_true)*np.sin(z_sim[1,0,:-1])*np.sin(z_sim[1,0,:-1]) + Lp_true)
+    kin_pend = kin_pend + 0.5*z_sim[3,0,:-1]*z_sim[3,0,:-1]*(Jp_true+mp_true*Lp_true*Lp_true) + mp_true*Lr_true*Lp_true*np.cos(z_sim[1,0,:-1])*z_sim[3,0,:-1]*z_sim[2,0,:-1]
     kin_base = 0.5*z_sim[2,0,:-1]*z_sim[2,0,:-1]*(mr_true*Lr_true*Lr_true + Jr_true)
     kin = kin_base + kin_pend
     pot = grav*mp_true*Lp_true*(1 - np.cos(z_sim[1,0,:-1]))
@@ -418,7 +419,6 @@ if plotme1:
     plt.xlim([0,49*0.025])
     plt.ticklabel_format(style='sci',axis='y',scilimits=(0,0))
     plt.ylabel('Pendulum err. distr. (rad)')
-    plt.xlabel('Time (s)')
     # plt.legend(loc = 'upper right')
 
     plt.subplot(4, 2, 7)
@@ -428,7 +428,6 @@ if plotme1:
     # plt.axhline(-z_star[1,0], linestyle='--', color='g', linewidth=1.0, label='Target')
     plt.xlim([0,49*0.025])
     plt.ylabel('Pendulum velocity (rad/s)')
-    plt.xlabel('Time (s)')
     # plt.legend(loc = 'upper right')
 
     plt.subplot(4, 2, 8)
@@ -442,9 +441,14 @@ if plotme1:
     plt.ylabel('Pendulum velocity err. distr. (rad/s)')
     plt.xlabel('Time (s)')
     # plt.legend(loc = 'upper right')
-    plt.figlegend(loc='upper center',bbox_to_anchor=[0.5, 0.05], ncol=5)
+    lgd = plt.figlegend(loc='upper center',bbox_to_anchor=[0.5, 0.05], ncol=5)
     plt.tight_layout(rect=[0,0.035,1,1])
     plt.savefig('stills/plot_states'+'.png',format='png')
+    fig.set_figheight(4.8)
+    lgd.set_bbox_to_anchor([0.5, 0.1])
+    # plt.figlegend(loc='upper center',bbox_to_anchor=[0.5, 0.1], ncol=5)
+    plt.tight_layout(rect=[0,0.07,1,1])
+    plt.savefig('stills/plot_states_short'+'.png',format='png')
     plt.close()
 
     ## ! PARAMS

@@ -143,8 +143,9 @@ plt.axhline(u_ub,linestyle='--',color='r',linewidth=2.)
 plt.ylabel('u', fontsize=fontsize)
 plt.xlabel(r'$t$', fontsize=fontsize)
 # plt.subplots_adjust(bottom=0.5)
+plt.tight_layout()
 plt.figlegend(loc='upper center',bbox_to_anchor=[0.55, 0.05], ncol=5)
-plt.tight_layout(rect=[0.0,0.1,1,1])
+
 
 
 plt.show()
