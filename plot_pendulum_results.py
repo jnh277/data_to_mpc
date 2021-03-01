@@ -287,12 +287,14 @@ if plotme1:
 
     plt.subplot(3, 2, 6)
     # plt.plot(ts,z_sim[1,0,:-1],label='True',linewidth = 2.0,color='k')
-    ener1 = 0.5*z_sim[2,0,:-1]*z_sim[2,0,:-1]*(mr_true*Lr_true*Lr_true + Jr_true)
-    ener2 = grav*mp_true*Lp_true*(1 - np.cos(z_sim[1,0,:-1])) + 0.5*z_sim[3,0,:-1]*z_sim[3,0,:-1]*(Jp_true+mp_true*Lp_true*Lp_true) + mp_true*Lr_true*Lp_true*np.cos(z_sim[1,0,:-1])*z_sim[3,0,:-1]*z_sim[2,0,:-1]
-    plt.plot(ts,ener1+ener2, color=u'#1f77b4',linewidth = 1)
+    kin_pend = 0.5*z_sim[3,0,:-1]*z_sim[3,0,:-1]*(Jp_true+mp_true*Lp_true*Lp_true) + mp_true*Lr_true*Lp_true*np.cos(z_sim[1,0,:-1])*z_sim[3,0,:-1]*z_sim[2,0,:-1]
+    kin_base = 0.5*z_sim[2,0,:-1]*z_sim[2,0,:-1]*(mr_true*Lr_true*Lr_true + Jr_true)
+    kin = kin_base + kin_pend
+    pot = grav*mp_true*Lp_true*(1 - np.cos(z_sim[1,0,:-1]))
+    plt.plot(ts,kin_pend + pot, color=u'#1f77b4',linewidth = 1)
     plt.ticklabel_format(style='sci',axis='y',scilimits=(0,0))
     plt.xlim([0,49*0.025])
-    plt.ylabel('Total system energy (J)')
+    plt.ylabel('Total pendulum energy (J)')
     plt.xlabel('Time (s)')
     # plt.legend(loc = 'upper right')
 
