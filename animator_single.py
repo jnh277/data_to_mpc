@@ -61,21 +61,9 @@ colours[qube] = u'#333333'
 origin_xy = np.array([3.0,4.0,0.0])
 origin = np.array([3.0,4.0,2+0.0254*scale])
 
-fig = plt.figure(figsize=(6.4*1.77777,6.4),dpi=300)
-# ax = p3.Axes3D(fig,azim=45,elev=30) #for on it's own
-ax = fig.add_subplot(4,7,(1,10), projection='3d',azim=45,elev=30)
-ctr_ax = fig.add_subplot(4,7,(4,7))
-Jp_ax = fig.add_subplot(4,7,(11,12))
-Jr_ax = fig.add_subplot(4,7,(13,14))
-Zpkde_ax = fig.add_subplot(4,7,15)
-Zp_ax = fig.add_subplot(4,7,(16,17))
-Km_ax = fig.add_subplot(4,7,(18,19))
-Rm_ax = fig.add_subplot(4,7,(20,21))
-Zrkde_ax = fig.add_subplot(4,7,22)
-Zr_ax = fig.add_subplot(4,7,(23,24))
-Dp_ax = fig.add_subplot(4,7,(25,26))
-Dr_ax = fig.add_subplot(4,7,(27,28))
-plt.tight_layout()
+fig = plt.figure(figsize=(6.4,6.4),dpi=300)
+ax = Axes3D(fig,azim=45,elev=30) #for on it's own
+
 ax.voxels(qube,facecolors=colours,edgecolors=None)
 
 ax.xaxis.set_ticklabels([])
@@ -94,16 +82,8 @@ X,Y,Z,X2,Y2,Z2,X3,Y3,Z3 = generate_cylinder(origin,origin,0.1)
 X4,Y4,Z4,X5,Y5,Z5,X6,Y6,Z6 = generate_cylinder(origin,origin,0.1)
 X7,Y7,Z7,X8,Y8,Z8,X9,Y9,Z9 = generate_cylinder(origin,origin,0.1)
 plot = [ax.plot_surface(X, Y, Z, color=u'#777777'),ax.plot_surface(X2, Y2, Z2, color=u'#777777'),ax.plot_surface(X3, Y3, Z3, color=u'#777777'), ax.plot_surface(X4, Y4, Z4, color=u'#777777'),ax.plot_surface(X5, Y5, Z5, color=u'#777777'),ax.plot_surface(X6, Y6, Z6, color=u'#777777'),ax.plot_surface(X7, Y7, Z7, color=u'#777777'),ax.plot_surface(X8, Y8, Z8, color=u'#777777'),ax.plot_surface(X9, Y9, Z9, color=u'#777777')]
-
-subplots = []
-# static elements
-Zr_ax.axhline(-0.75*np.pi,color='r',linestyle='--',linewidth=1)
-Zr_ax.axhline(0.75*np.pi,color='r',linestyle='--',linewidth=1)
-ctr_ax.axhline(18.0, linestyle='--', color='r', linewidth=1)
-ctr_ax.axhline(-18.0, linestyle='--', color='r', linewidth=1,label='constraint')
-
 #frame update function
-def animate(i,theta,alpha,origin,plot,subplots):
+def animate(i,theta,alpha,origin,plot):
     # ls = LightSource(azdeg =0, altdeg = 65)
     ## ! 3d PLOTS
     plot[0].remove()
@@ -146,8 +126,8 @@ def animate(i,theta,alpha,origin,plot,subplots):
     plot[7] = ax.plot_surface(X2, Y2, Z2, color=u'#EE1111')
     plot[8] = ax.plot_surface(X3, Y3, Z3, color=u'#EE1111')
 
-ani = animation.FuncAnimation(fig, animate, frames=len(theta), fargs=(theta,alpha,origin,plot,subplots),
+ani = animation.FuncAnimation(fig, animate, frames=len(theta), fargs=(theta,alpha,origin,plot),
                               interval=100, blit=False)
 
-ani.save('pendulum_'+run+'_subplots.mp4',writer='ffmpeg',fps=30)
+ani.save('pendulum_'+run+'.mp4',writer='ffmpeg',fps=30)
 # plt.show()
