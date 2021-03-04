@@ -72,6 +72,8 @@ input_constraints = (lambda u: input_bound - u, lambda u: u + input_bound)
 # start making the priors worse
 # run11: 10% prior mean error, 20% standard deviation
 # run12: same but definitely satisfies constraints with desired probability
+# run13: 25% prior mean error, 50% standard deviation
+# run14: 50% prior mean error, 100% standard deviation
 
 # simulation parameters
 # TODO: WARNING DONT MAKE T > 100 due to size of saved inv_metric
@@ -254,7 +256,7 @@ uc_save = np.zeros((1, Nh, T))
 mpc_result_save = []
 hmc_traces_save = []
 
-# run = 'run13'
+# run = 'run14'
 # with open('results/'+run+'/xt_est_save100.pkl','wb') as file:
 #     pickle.dump(xt_est_save, file)
 # with open('results/'+run+'/theta_est_save100.pkl','wb') as file:
@@ -271,6 +273,11 @@ hmc_traces_save = []
 #     pickle.dump(mpc_result_save, file)
 # with open('results/'+run+'/uc_save100.pkl', 'wb') as file:
 #     pickle.dump(uc_save, file)
+
+# predefine the mean of the prior so it doesnt change from run to run
+theta_p_mu = np.array([1.5*Jr_true, 0.5*Jp_true, 1.5*Km_true,
+                       0.5*Rm_true, 1.5*Dp_true, 0.5*Dr_true])
+u[0,0] = -5.
 
 ### SIMULATE SYSTEM AND PERFORM MPC CONTROL
 for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control'):
@@ -301,6 +308,7 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
     #             'q_p_std': np.array([q1_true, q2_true, 0.5*q3_true, 0.5*q3_true]),
     #             }
     ## data and slighty worse priors
+
     stan_data ={'no_obs': t+1,
                 'Ts':Ts,
                 'y': y[:, :t+1],
@@ -309,8 +317,8 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
                 'Mp':mp_true,
                 'Lp':Lp_true,
                 'g':grav,
-                'theta_p_mu':1.1 * np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
-                'theta_p_std':0.2 * np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
+                'theta_p_mu':theta_p_mu,
+                'theta_p_std':1.0 * np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
                 'r_p_mu': np.array([r1_true, r2_true, r3_true]),
                 'r_p_std': 0.5*np.array([r1_true, r2_true, r3_true]),
                 'q_p_mu': np.array([q1_true, q2_true, q3_true, q4_true]),
