@@ -30,6 +30,7 @@ from tqdm import tqdm
 # jax related imports
 import jax.numpy as jnp
 from jax import grad, jit, device_put, jacfwd, jacrev
+from jax.lax import scan
 from jax.ops import index, index_add, index_update
 from jax.config import config
 
@@ -77,7 +78,7 @@ input_constraints = (lambda u: input_bound - u, lambda u: u + input_bound)
 
 # simulation parameters
 # TODO: WARNING DONT MAKE T > 100 due to size of saved inv_metric
-T = 50             # number of time steps to simulate and record measurements for
+T = 2             # number of time steps to simulate and record measurements for
 Ts = 0.025
 # z1_0 = 0.7*np.pi            # initial states
 # z1_0 = -0.7*np.pi            # initial states
@@ -176,7 +177,7 @@ def rk4(xt, ut, theta):
     k4 = qube_gradient(xt + k3 * h, ut, theta)
     return xt + (k1 / 6 + k2 / 3 + k3 / 3 + k4 / 6) * h  # should handle a 2D x just fine
 
-
+# @jit
 def pend_simulate(xt, u, w,
                   theta):  # w is expected to be 3D. xt is expected to be 2D. ut is expected to be 2d but also, should handle being a vector (3d)
     [Nx, Ns, Np1] = w.shape
@@ -186,11 +187,23 @@ def pend_simulate(xt, u, w,
     #     print('wyd??')
     x = jnp.zeros((Nx, Ns, Np1 + 1))
     x = index_update(x, index[:, :, 0], xt)
-    for ii in range(Np1):
-        x = index_update(x, index[:, :, ii + 1], rk4(x[:, :, ii], u[:, ii], theta) + w[:, :,
-                                                                                     ii])  # slicing creates 2d x into 3d x. Also, Np1 loop will consume all of w
-    return x[:, :, 1:]  # return everything except xt
+    iis = jnp.arange(Np1)
+    dict = {
+        'x':x,
+        'u':u,
+        'w':w,
+        'theta':theta
+    }
+    dict,_ = scan(scan_func,dict,iis)
+    # for ii in range(Np1):
+    #     x = index_update(x, index[:, :, ii + 1], rk4(x[:, :, ii], u[:, ii], theta) + w[:, :,
+    #                                                                                  ii])  # slicing creates 2d x into 3d x. Also, Np1 loop will consume all of w
+    
+    return dict['x'][:, :, 1:]  # return everything except xt
 
+def scan_func(carry,ii):
+    carry['x'] = index_update(carry['x'], index[:, :, ii + 1], rk4(carry['x'][:, :, ii], carry['u'][:, ii], carry['theta']) + carry['w'][:, :, ii])
+    return carry, []
 
 # compile cost and create gradient and hessian functions
 sim = jit(pend_simulate)  # static argnums means it will recompile if N changes
