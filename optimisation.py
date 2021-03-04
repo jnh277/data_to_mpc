@@ -353,7 +353,7 @@ def log_barrier_cosine_cost(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, ga
          jnp.sum((sqc[0, 0] * (x[0, :, 1:] - x_star[0, 0])) ** 2) + \
          jnp.sum((sqc[2, 2] * (x[2, :, 1:] - x_star[2, 0])) ** 2) + \
          jnp.sum((sqc[3, 3] * (x[3, :, 1:] - x_star[3, 0])) ** 2) + \
-         jnp.sum(jnp.matmul(src, uc) ** 2) + jnp.sum(600 * (epsilon + 1e3) ** 2)
+         jnp.sum(jnp.matmul(src, uc) ** 2) + jnp.sum(2000 * (epsilon + 1e3) ** 2)
     # need a log barrier on each of the slack variables to ensure they are positve
     V2 = logbarrier(epsilon - delta, mu)     # aiming for 1-delta% accuracy
     # now the chance constraints
