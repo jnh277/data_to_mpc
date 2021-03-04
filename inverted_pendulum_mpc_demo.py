@@ -78,7 +78,7 @@ input_constraints = (lambda u: input_bound - u, lambda u: u + input_bound)
 
 # simulation parameters
 # TODO: WARNING DONT MAKE T > 100 due to size of saved inv_metric
-T = 2             # number of time steps to simulate and record measurements for
+T = 50             # number of time steps to simulate and record measurements for
 Ts = 0.025
 # z1_0 = 0.7*np.pi            # initial states
 # z1_0 = -0.7*np.pi            # initial states
