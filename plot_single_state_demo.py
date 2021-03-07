@@ -125,6 +125,7 @@ with open('results/'+run+'/mpc_result_save100.pkl', 'rb') as file:
 
 fontsize=12
 plt.subplot(2,1,1)
+plt.rcParams["font.family"] = "Times New Roman"
 #print(plt.rcParams['axes.prop_cycle'].by_key()['color'])
 plt.fill_between(np.arange(T),np.percentile(xt_est_save[0,:,:],97.5,axis=0),np.percentile(xt_est_save[0,:,:],2.5,axis=0),alpha=0.2,label='95% CI',color=u'#1f77b4')
 plt.plot(x,label='True', color='k',linewidth=2.)
@@ -143,13 +144,15 @@ plt.axhline(u_ub,linestyle='--',color='r',linewidth=2.)
 plt.ylabel('u', fontsize=fontsize)
 plt.xlabel(r'$t$', fontsize=fontsize)
 # plt.subplots_adjust(bottom=0.5)
-plt.figlegend(loc='upper center',bbox_to_anchor=[0.55, 0.05], ncol=5)
-plt.tight_layout(rect=[0.0,0.1,1,1])
+plt.figlegend(loc='upper center',bbox_to_anchor=[0.55, 0.07], ncol=5)
+plt.tight_layout(rect=[0.0,0.03,1,1])
 
-
-plt.show()
+plt.savefig('stills/order1_x_u.png', format='png')
+plt.close()
+# plt.show()
 
 plt.subplot(2,2,1)
+plt.rcParams["font.family"] = "Times New Roman"
 plt.plot(a_est_save.mean(axis=0),linewidth=2)
 plt.fill_between(np.arange(T),np.percentile(a_est_save,97.5,axis=0),np.percentile(a_est_save,2.5,axis=0),color=u'#1f77b4',alpha=0.15)
 # plt.plot(np.percentile(a_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
@@ -195,9 +198,11 @@ plt.xlabel(r'$t$',fontsize=fontsize)
 
 # plt.figlegend(loc='upper center',bbox_to_anchor=[0.5, 0.1],ncol=3)
 # plt.tight_layout(rect=[0,0.1,1,1])
-plt.figlegend(loc='upper center',bbox_to_anchor=[0.54, 0.0566666], ncol=5)
-plt.tight_layout(rect=[0,0.06666666,1,1])
-plt.show()
+plt.figlegend(loc='upper center',bbox_to_anchor=[0.54, 0.0666666], ncol=5)
+plt.tight_layout(rect=[0,0.03,1,1])
+plt.savefig('stills/order1_params.png', format='png')
+plt.close()
+# plt.show()
 
 
 result = mpc_result_save[5]
@@ -224,6 +229,7 @@ if len(input_constraints) > 0:
 #
 for i in range(3):
     plt.subplot(2,3,i+1)
+    plt.rcParams["font.family"] = "Times New Roman"
     sns.kdeplot(data=x_mpc[0, :, i*3], fill=True, alpha=.5, linewidth=0.2,label='density')
     # plt.hist(x_mpc[0,:, i*3], label='MC forward sim',density=True)
     plt.ylabel('')
@@ -235,10 +241,12 @@ for i in range(3):
     # if i==2:
         # plt.legend(bbox_to_anchor=(0.85, 0.85))
     plt.xlabel(r'$x_{t+k}$ for $k='+str(i*3+1)+'$', fontsize=fontsize)
+    plt.xlim([-0.7,2.3])
     plt.yticks([])
 plt.tight_layout()
 
 plt.subplot(2,1,2)
+plt.rcParams["font.family"] = "Times New Roman"
 plt.plot(np.arange(1,N+1),uc[0,:],color='k',linewidth=2.0)
 plt.axhline(u_ub, linestyle='--', color='r', linewidth=2, label='constraint')
 # plt.title(r'Control action over horizon for $t=6$')
