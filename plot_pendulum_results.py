@@ -199,7 +199,7 @@ theta_true = fill_theta(theta_true)
 
 
 ## load results
-run = 'run11'
+run = 'run12'
 with open('results/'+run+'/xt_est_save100.pkl','rb') as file:
     xt_est_save = pickle.load(file)
 with open('results/'+run+'/theta_est_save100.pkl','rb') as file:
@@ -226,7 +226,7 @@ if plotme1:
     plt.title('MPC determined control action')
     plt.axhline(input_bound, linestyle='--', color='r', linewidth=2, label='constraint')
     plt.axhline(-input_bound, linestyle='--', color='r', linewidth=2, label='constraint')
-    plt.savefig('stills/plot_action'+'.png',format='png')
+    plt.savefig('stills/'+run+'_plot_action'+'.png',format='png')
     plt.close()
     # plt.show()
 
@@ -287,19 +287,22 @@ if plotme1:
 
     plt.subplot(3, 2, 6)
     # plt.plot(ts,z_sim[1,0,:-1],label='True',linewidth = 2.0,color='k')
-    ener1 = 0.5*z_sim[2,0,:-1]*z_sim[2,0,:-1]*(mr_true*Lr_true*Lr_true + Jr_true)
-    ener2 = grav*mp_true*Lp_true*(1 - np.cos(z_sim[1,0,:-1])) + 0.5*z_sim[3,0,:-1]*z_sim[3,0,:-1]*(Jp_true+mp_true*Lp_true*Lp_true) + mp_true*Lr_true*Lp_true*np.cos(z_sim[1,0,:-1])*z_sim[3,0,:-1]*z_sim[2,0,:-1]
-    plt.plot(ts,ener1+ener2, color=u'#1f77b4',linewidth = 1)
+    kin_pend = 0.5*z_sim[2,0,:-1]*z_sim[2,0,:-1]*(mp_true*Lp_true*Lp_true + (mp_true*Lp_true*Lp_true+Jp_true)*np.sin(z_sim[1,0,:-1])*np.sin(z_sim[1,0,:-1]) + Lp_true)
+    kin_pend = kin_pend + 0.5*z_sim[3,0,:-1]*z_sim[3,0,:-1]*(Jp_true+mp_true*Lp_true*Lp_true) + mp_true*Lr_true*Lp_true*np.cos(z_sim[1,0,:-1])*z_sim[3,0,:-1]*z_sim[2,0,:-1]
+    kin_base = 0.5*z_sim[2,0,:-1]*z_sim[2,0,:-1]*(mr_true*Lr_true*Lr_true + Jr_true)
+    kin = kin_base + kin_pend
+    pot = grav*mp_true*Lp_true*(1 - np.cos(z_sim[1,0,:-1]))
+    plt.plot(ts,kin_pend + pot, color=u'#1f77b4',linewidth = 1)
     plt.ticklabel_format(style='sci',axis='y',scilimits=(0,0))
     plt.xlim([0,49*0.025])
-    plt.ylabel('Total system energy (J)')
+    plt.ylabel('Total pendulum energy (J)')
     plt.xlabel('Time (s)')
     # plt.legend(loc = 'upper right')
 
 
     plt.figlegend(loc='upper center',bbox_to_anchor=[0.5, 0.0666666], ncol=5)
     plt.tight_layout(rect=[0,0.04666666,1,1])
-    plt.savefig('stills/plot_angles_and_control'+'.png',format='png')
+    plt.savefig('stills/'+run+'_plot_angles_and_control'+'.png',format='png')
     plt.close()
 
     ## ! PLOT ANGLES
@@ -349,7 +352,7 @@ if plotme1:
     # plt.legend(loc = 'upper right')
     plt.figlegend(loc='upper center',bbox_to_anchor=[0.5, 0.1], ncol=5)
     plt.tight_layout(rect=[0,0.07,1,1])
-    plt.savefig('stills/plot_angles'+'.png',format='png')
+    plt.savefig('stills/'+run+'_plot_angles'+'.png',format='png')
     plt.close()
 
     ## ! FULL STATE
@@ -416,7 +419,6 @@ if plotme1:
     plt.xlim([0,49*0.025])
     plt.ticklabel_format(style='sci',axis='y',scilimits=(0,0))
     plt.ylabel('Pendulum err. distr. (rad)')
-    plt.xlabel('Time (s)')
     # plt.legend(loc = 'upper right')
 
     plt.subplot(4, 2, 7)
@@ -426,7 +428,6 @@ if plotme1:
     # plt.axhline(-z_star[1,0], linestyle='--', color='g', linewidth=1.0, label='Target')
     plt.xlim([0,49*0.025])
     plt.ylabel('Pendulum velocity (rad/s)')
-    plt.xlabel('Time (s)')
     # plt.legend(loc = 'upper right')
 
     plt.subplot(4, 2, 8)
@@ -440,9 +441,14 @@ if plotme1:
     plt.ylabel('Pendulum velocity err. distr. (rad/s)')
     plt.xlabel('Time (s)')
     # plt.legend(loc = 'upper right')
-    plt.figlegend(loc='upper center',bbox_to_anchor=[0.5, 0.05], ncol=5)
+    lgd = plt.figlegend(loc='upper center',bbox_to_anchor=[0.5, 0.05], ncol=5)
     plt.tight_layout(rect=[0,0.035,1,1])
-    plt.savefig('stills/plot_states'+'.png',format='png')
+    plt.savefig('stills/'+run+'_plot_states'+'.png',format='png')
+    fig.set_figheight(4.8)
+    lgd.set_bbox_to_anchor([0.5, 0.1])
+    # plt.figlegend(loc='upper center',bbox_to_anchor=[0.5, 0.1], ncol=5)
+    plt.tight_layout(rect=[0,0.07,1,1])
+    plt.savefig('stills/'+run+'_plot_states_short'+'.png',format='png')
     plt.close()
 
     ## ! PARAMS
@@ -454,7 +460,7 @@ if plotme1:
     plt.ticklabel_format(style='sci',axis='y',scilimits=(0,0))
     plt.xlim([0,49*0.025])
     plt.title(r'$J_r$ estimate over simulation')
-    plt.savefig('stills/plot_'+str(ind)+'.png',format='png')
+    plt.savefig('stills/'+run+'_plot_'+str(ind)+'.png',format='png')
     plt.close()
 
     ind = 1
@@ -466,7 +472,7 @@ if plotme1:
     plt.xlabel(r'Time (s)')
     plt.xlim([0,49*0.025])
     plt.title(r'$J_p$ estimate over simulation')
-    plt.savefig('stills/plot_'+str(ind)+'.png',format='png')
+    plt.savefig('stills/'+run+'_plot_'+str(ind)+'.png',format='png')
     plt.close()
     # plt.show()
 
@@ -478,7 +484,7 @@ if plotme1:
     plt.xlabel('Time (s)')
     plt.xlim([0,49*0.025])
     plt.title(r'$K_m$ estimate over simulation')
-    plt.savefig('stills/plot_'+str(ind)+'.png',format='png')
+    plt.savefig('stills/'+run+'_plot_'+str(ind)+'.png',format='png')
     plt.close()
 
     ind = 3
@@ -489,7 +495,7 @@ if plotme1:
     plt.xlim([0,49*0.025])
     plt.xlabel('Time (s)')
     plt.title(r'$R_m$ estimate over simulation')
-    plt.savefig('stills/plot_'+str(ind)+'.png',format='png')
+    plt.savefig('stills/'+run+'_plot_'+str(ind)+'.png',format='png')
     plt.close()
     # plt.show()
 
@@ -502,7 +508,7 @@ if plotme1:
     plt.xlim([0,49*0.025])
     plt.xlabel('Time (s)')
     plt.title(r'$D_p$ estimate over simulation')
-    plt.savefig('stills/plot_'+str(ind)+'.png',format='png')
+    plt.savefig('stills/'+run+'_plot_'+str(ind)+'.png',format='png')
     plt.close()
 
     ind = 5
@@ -514,7 +520,7 @@ if plotme1:
     plt.xlim([0,49*0.025])
     plt.xlabel('Time (s)')
     plt.title(r'$D_r$ estimate over simulation')
-    plt.savefig('stills/plot_'+str(ind)+'.png',format='png')
+    plt.savefig('stills/'+run+'_plot_'+str(ind)+'.png',format='png')
     plt.close()
     # plt.show()
 
@@ -553,7 +559,7 @@ if plotme1:
     plt.xlabel('Time (s)')
     # plt.title(r'$D_r$ estimate over simulation')
     plt.tight_layout()
-    plt.savefig('stills/subplot_params.png',format='png')
+    plt.savefig('stills/'+run+'_subplot_params.png',format='png')
     plt.close()
 
     # ! SIX FIGURE SUBPLOT
@@ -628,7 +634,7 @@ if plotme1:
 
     plt.tight_layout(rect=[0,0.07,1,1])
     plt.figlegend(('True value','Sample mean','95% CI'),loc='upper center',bbox_to_anchor=[0.5, 0.1], ncol=3)
-    plt.savefig('stills/subplot_params_six.png',format='png')
+    plt.savefig('stills/'+run+'_subplot_params_six.png',format='png')
     plt.close()
 
 # from matplotlib import animation
