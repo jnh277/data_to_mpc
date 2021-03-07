@@ -137,3 +137,7 @@ dmypy.json
 !stan_traces/inv_metric.pkl
 !stan_traces/step_size.pkl
 !stan_traces/last_pos.pkl
+
+*.mp4
+stills/*
+*.png
