@@ -76,7 +76,7 @@ def simulate(xt, u, w, theta):
 
 
 
-run = 'single_state_demo_result2'
+run = 'single_state_demo_results'
 with open('results/'+run+'/xt_est_save.pkl','rb') as file:
     xt_est_save = pickle.load(file)
 with open('results/'+run+'/a_est_save.pkl','rb') as file:
