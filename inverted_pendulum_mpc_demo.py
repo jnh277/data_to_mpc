@@ -17,7 +17,10 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ###############################################################################
 
-# TODO: script description
+""" This script runs simulation B) Rotary inverted pendulum from the paper and saves the results """
+""" This script will take a fair amount of time to run if you have not installed cuda enabled JAX,
+    presaved results are included and can be plotted without running this script """
+""" The results can then be plotted using the script 'plot_pendulum_results.py' """
 
 # general imports
 import pystan
@@ -182,10 +185,6 @@ def rk4(xt, ut, theta):
 def pend_simulate(xt, u, w,
                   theta):  # w is expected to be 3D. xt is expected to be 2D. ut is expected to be 2d but also, should handle being a vector (3d)
     [Nx, Ns, Np1] = w.shape
-    # if u.ndim == 2:  # conditional checks might slow jax down
-    #     Nu = u.shape[1]
-    # if Nu != Np1:
-    #     print('wyd??')
     x = jnp.zeros((Nx, Ns, Np1 + 1))
     x = index_update(x, index[:, :, 0], xt)
     iis = jnp.arange(Np1)
@@ -196,9 +195,6 @@ def pend_simulate(xt, u, w,
         'theta':theta
     }
     dict,_ = scan(scan_func,dict,iis)
-    # for ii in range(Np1):
-    #     x = index_update(x, index[:, :, ii + 1], rk4(x[:, :, ii], u[:, ii], theta) + w[:, :,
-    #                                                                                  ii])  # slicing creates 2d x into 3d x. Also, Np1 loop will consume all of w
     
     return dict['x'][:, :, 1:]  # return everything except xt
 
@@ -252,9 +248,6 @@ cost = jit(log_barrier_cosine_cost, static_argnums=(11,12,13, 14, 15))  # static
 gradient = jit(grad(log_barrier_cosine_cost, argnums=0), static_argnums=(11, 12, 13, 14, 15))    # get compiled function to return gradients with respect to z (uc, s)
 hessian = jit(jacfwd(jacrev(log_barrier_cosine_cost, argnums=0)), static_argnums=(11, 12, 13, 14, 15))
 
-# cost = jit(log_barrier_cost, static_argnums=(11,12,13, 14, 15))  # static argnums means it will recompile if N changes
-# gradient = jit(grad(log_barrier_cost, argnums=0), static_argnums=(11, 12, 13, 14, 15))    # get compiled function to return gradients with respect to z (uc, s)
-# hessian = jit(jacfwd(jacrev(log_barrier_cost, argnums=0)), static_argnums=(11, 12, 13, 14, 15))
 
 mu = 1e4
 gamma = 1
@@ -270,28 +263,10 @@ uc_save = np.zeros((1, Nh, T))
 mpc_result_save = []
 hmc_traces_save = []
 
-# run = 'run14'
-# with open('results/'+run+'/xt_est_save100.pkl','wb') as file:
-#     pickle.dump(xt_est_save, file)
-# with open('results/'+run+'/theta_est_save100.pkl','wb') as file:
-#     pickle.dump(theta_est_save, file)
-# with open('results/'+run+'/q_est_save100.pkl','wb') as file:
-#     pickle.dump(q_est_save, file)
-# with open('results/'+run+'/r_est_save100.pkl','wb') as file:
-#     pickle.dump(r_est_save, file)
-# with open('results/'+run+'/z_sim100.pkl','wb') as file:
-#     pickle.dump(z_sim, file)
-# with open('results/'+run+'/u100.pkl','wb') as file:
-#     pickle.dump(u, file)
-# with open('results/'+run+'/mpc_result_save100.pkl', 'wb') as file:
-#     pickle.dump(mpc_result_save, file)
-# with open('results/'+run+'/uc_save100.pkl', 'wb') as file:
-#     pickle.dump(uc_save, file)
-
 # predefine the mean of the prior so it doesnt change from run to run
-theta_p_mu = np.array([1.5*Jr_true, 0.5*Jp_true, 1.5*Km_true,
-                       0.5*Rm_true, 1.5*Dp_true, 0.5*Dr_true])
-u[0,0] = -5.
+theta_p_mu = np.array([1.1*Jr_true, 1.1*Jp_true, 1.1*Km_true,
+                       1.1*Rm_true, 1.1*Dp_true, 1.1*Dr_true])
+u[0,0] = 0.
 
 ### SIMULATE SYSTEM AND PERFORM MPC CONTROL
 for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control'):
@@ -305,24 +280,6 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
 
 
     # estimate system (estimates up to x_t)
-    ## data and good priors
-    # stan_data ={'no_obs': t+1,
-    #             'Ts':Ts,
-    #             'y': y[:, :t+1],
-    #             'u': u[0, :t+1],
-    #             'Lr':Lr_true,
-    #             'Mp':mp_true,
-    #             'Lp':Lp_true,
-    #             'g':grav,
-    #             'theta_p_mu':np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
-    #             'theta_p_std':0.1*np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
-    #             'r_p_mu': np.array([r1_true, r2_true, r3_true]),
-    #             'r_p_std': 0.5*np.array([r1_true, r2_true, r3_true]),
-    #             'q_p_mu': np.array([q1_true, q2_true, q3_true, q4_true]),
-    #             'q_p_std': np.array([q1_true, q2_true, 0.5*q3_true, 0.5*q3_true]),
-    #             }
-    ## data and slighty worse priors
-
     stan_data ={'no_obs': t+1,
                 'Ts':Ts,
                 'y': y[:, :t+1],
@@ -332,7 +289,7 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
                 'Lp':Lp_true,
                 'g':grav,
                 'theta_p_mu':theta_p_mu,
-                'theta_p_std':1.0 * np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
+                'theta_p_std':0.2 * np.array([Jr_true, Jp_true, Km_true, Rm_true, Dp_true, Dr_true]),
                 'r_p_mu': np.array([r1_true, r2_true, r3_true]),
                 'r_p_std': 0.5*np.array([r1_true, r2_true, r3_true]),
                 'q_p_mu': np.array([q1_true, q2_true, q3_true, q4_true]),
@@ -360,7 +317,6 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
         z_init[2, -1] = z_init[2, -2]
         z_init[3, :-1] = np.gradient(y[1, :t+1]) / Ts
         z_init[3, -1] = z_init[3, -2]
-    # z_init = z_sim[:,0,:t+2]
 
     # chain initialisation
     def init_function(ind):
@@ -391,8 +347,6 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
     r_mpc = traces['r']
     q_mpc = traces['q']
 
-    # TODO: use the standard deviation of the chains to check if they ran well
-    # TODO: check that excluding a chain wont cause a recompile
 
     # parameter samples
     Jr_samps = theta[:, 0].squeeze()
@@ -441,11 +395,6 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
     # calculate next control action
     if t > 0:
         uc0 = np.hstack((uc[[0],1:],np.reshape(uc[0,-1],(1,1))))
-        # uc0 = uc
-        # mu = result['mu'] * 2 ** 8
-        # gamma = result['gamma'] * 1.25 ** 8
-        # mu = 1e-6 * 2 ** 8
-        # mu = 1e-3 * 1.25 ** 8
         mu = 200
         gamma = 0.2
         result = solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta_mpc, w_mpc, z_star, sqc,
@@ -467,103 +416,122 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
 # plt.plot(theta_est_save[:,0,11])
 # plt.show()
 
-plt.plot(u[0,:])
-plt.title('MPC determined control action')
-plt.axhline(input_bound, linestyle='--', color='r', linewidth=2, label='constraint')
-plt.axhline(-input_bound, linestyle='--', color='r', linewidth=2, label='constraint')
-plt.show()
 
-plt.subplot(2, 1, 1)
-plt.plot(z_sim[0,0,:],label='True',color='k')
-plt.plot(xt_est_save[:,0,:].mean(axis=0), color='b',label='mean')
-plt.plot(np.percentile(xt_est_save[:,0,:],97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-plt.plot(np.percentile(xt_est_save[:,0,:],2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-plt.axhline(state_bound, linestyle='--', color='r', linewidth=2, label='constraint')
-plt.axhline(-state_bound, linestyle='--', color='r', linewidth=2)
-plt.ylabel('arm angle')
-plt.legend()
-
-plt.subplot(2, 1, 2)
-plt.plot(z_sim[1,0,:],label='True',color='k')
-plt.plot(xt_est_save[:,1,:].mean(axis=0), color='b',label='mean')
-plt.plot(np.percentile(xt_est_save[:,1,:],97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-plt.plot(np.percentile(xt_est_save[:,1,:],2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-plt.axhline(-z_star[1,0], linestyle='--', color='g', linewidth=2, label='target')
-plt.ylabel('pendulum angle')
-plt.legend()
-
-plt.show()
-
-# for t in range(T):
-#     plt.plot(np.arange(Nh)+t,uc_save[0,:,t])
-# plt.title('Control over horizon from each MPC solve')
-# plt.show()
-
-if len(state_constraints) > 0:
-    x_mpc = sim(xt, np.hstack([ut, uc]), w_mpc, theta_mpc)
-    hx = np.concatenate([state_constraint(x_mpc[:, :, 1:]) for state_constraint in state_constraints], axis=2)
-    cx = np.mean(hx > 0, axis=1)
-    print('State constraint satisfaction')
-    print(cx)
-if len(input_constraints) > 0:
-    cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints],axis=1)
-    print('Input constraint satisfaction')
-    print(cu >= 0)
+run = 'rotary_inverted_pendulum_demo_results'
+with open('results/'+run+'/xt_est_save100.pkl','wb') as file:
+    pickle.dump(xt_est_save, file)
+with open('results/'+run+'/theta_est_save100.pkl','wb') as file:
+    pickle.dump(theta_est_save, file)
+with open('results/'+run+'/q_est_save100.pkl','wb') as file:
+    pickle.dump(q_est_save, file)
+with open('results/'+run+'/r_est_save100.pkl','wb') as file:
+    pickle.dump(r_est_save, file)
+with open('results/'+run+'/z_sim100.pkl','wb') as file:
+    pickle.dump(z_sim, file)
+with open('results/'+run+'/u100.pkl','wb') as file:
+    pickle.dump(u, file)
+with open('results/'+run+'/mpc_result_save100.pkl', 'wb') as file:
+    pickle.dump(mpc_result_save, file)
+with open('results/'+run+'/uc_save100.pkl', 'wb') as file:
+    pickle.dump(uc_save, file)
 #
-for i in range(6):
-    plt.subplot(2,3,i+1)
-    plt.hist(x_mpc[1,:, i*4], label='MC forward sim')
-    if i==1:
-        plt.title('MPC solution over horizon')
-    plt.axvline(z_star[1,0], linestyle='--', color='g', linewidth=2, label='target')
-    plt.xlabel('t+'+str(i*4+1))
-plt.tight_layout()
-plt.legend()
-plt.show()
-
-
-
-plt.plot(x_mpc[0,:,:].mean(axis=0))
-plt.title('Predicted future arm angles')
-plt.axhline(state_bound, linestyle='--', color='r', linewidth=2, label='constraint')
-plt.axhline(-state_bound, linestyle='--', color='r', linewidth=2)
-plt.show()
-
-plt.plot(x_mpc[1,:,:].mean(axis=0))
-plt.axhline(z_star[1,0], linestyle='--', color='g', linewidth=2, label='target')
-plt.title('Predicted future pendulum angles')
-plt.show()
-
-
-ind = 0
-plt.plot(theta_est_save[:,ind,:].mean(axis=0),color='b',label='mean')
-plt.plot(np.percentile(theta_est_save[:,ind,:],97.5,axis=0),color='b',linestyle='--',label='95% CI')
-plt.plot(np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color='b',linestyle='--')
-plt.axhline(Jr_true,color='k',label='True')
-plt.legend()
-plt.xlabel('time step')
-plt.title('Jr estimate over simulation')
-plt.show()
-
-ind = 2
-plt.plot(theta_est_save[:,ind,:].mean(axis=0),color='b',label='mean')
-plt.plot(np.percentile(theta_est_save[:,ind,:],97.5,axis=0),color='b',linestyle='--',label='95% CI')
-plt.plot(np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color='b',linestyle='--')
-plt.axhline(Km_true,color='k',label='True')
-plt.legend()
-plt.xlabel('time step')
-plt.title('Km estimate over simulation')
-plt.show()
-
-ind = 3
-plt.plot(theta_est_save[:,ind,:].mean(axis=0),color='b',label='mean')
-plt.plot(np.percentile(theta_est_save[:,ind,:],97.5,axis=0),color='b',linestyle='--',label='95% CI')
-plt.plot(np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color='b',linestyle='--')
-plt.axhline(Rm_true,color='k',label='True')
-plt.legend()
-plt.xlabel('time step')
-plt.title('Rm estimate over simulation')
-plt.show()
-
-for result in mpc_result_save:
-    print(result['epsilon'].max())
+# plt.plot(u[0,:])
+# plt.title('MPC determined control action')
+# plt.axhline(input_bound, linestyle='--', color='r', linewidth=2, label='constraint')
+# plt.axhline(-input_bound, linestyle='--', color='r', linewidth=2, label='constraint')
+# plt.show()
+#
+# plt.subplot(2, 1, 1)
+# plt.plot(z_sim[0,0,:],label='True',color='k')
+# plt.plot(xt_est_save[:,0,:].mean(axis=0), color='b',label='mean')
+# plt.plot(np.percentile(xt_est_save[:,0,:],97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
+# plt.plot(np.percentile(xt_est_save[:,0,:],2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
+# plt.axhline(state_bound, linestyle='--', color='r', linewidth=2, label='constraint')
+# plt.axhline(-state_bound, linestyle='--', color='r', linewidth=2)
+# plt.ylabel('arm angle')
+# plt.legend()
+#
+# plt.subplot(2, 1, 2)
+# plt.plot(z_sim[1,0,:],label='True',color='k')
+# plt.plot(xt_est_save[:,1,:].mean(axis=0), color='b',label='mean')
+# plt.plot(np.percentile(xt_est_save[:,1,:],97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
+# plt.plot(np.percentile(xt_est_save[:,1,:],2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
+# plt.axhline(-z_star[1,0], linestyle='--', color='g', linewidth=2, label='target')
+# plt.ylabel('pendulum angle')
+# plt.legend()
+#
+# plt.show()
+#
+# # for t in range(T):
+# #     plt.plot(np.arange(Nh)+t,uc_save[0,:,t])
+# # plt.title('Control over horizon from each MPC solve')
+# # plt.show()
+#
+# if len(state_constraints) > 0:
+#     x_mpc = sim(xt, np.hstack([ut, uc]), w_mpc, theta_mpc)
+#     hx = np.concatenate([state_constraint(x_mpc[:, :, 1:]) for state_constraint in state_constraints], axis=2)
+#     cx = np.mean(hx > 0, axis=1)
+#     print('State constraint satisfaction')
+#     print(cx)
+# if len(input_constraints) > 0:
+#     cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints],axis=1)
+#     print('Input constraint satisfaction')
+#     print(cu >= 0)
+# #
+# for i in range(6):
+#     plt.subplot(2,3,i+1)
+#     plt.hist(x_mpc[1,:, i*4], label='MC forward sim')
+#     if i==1:
+#         plt.title('MPC solution over horizon')
+#     plt.axvline(z_star[1,0], linestyle='--', color='g', linewidth=2, label='target')
+#     plt.xlabel('t+'+str(i*4+1))
+# plt.tight_layout()
+# plt.legend()
+# plt.show()
+#
+#
+#
+# plt.plot(x_mpc[0,:,:].mean(axis=0))
+# plt.title('Predicted future arm angles')
+# plt.axhline(state_bound, linestyle='--', color='r', linewidth=2, label='constraint')
+# plt.axhline(-state_bound, linestyle='--', color='r', linewidth=2)
+# plt.show()
+#
+# plt.plot(x_mpc[1,:,:].mean(axis=0))
+# plt.axhline(z_star[1,0], linestyle='--', color='g', linewidth=2, label='target')
+# plt.title('Predicted future pendulum angles')
+# plt.show()
+#
+#
+# ind = 0
+# plt.plot(theta_est_save[:,ind,:].mean(axis=0),color='b',label='mean')
+# plt.plot(np.percentile(theta_est_save[:,ind,:],97.5,axis=0),color='b',linestyle='--',label='95% CI')
+# plt.plot(np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color='b',linestyle='--')
+# plt.axhline(Jr_true,color='k',label='True')
+# plt.legend()
+# plt.xlabel('time step')
+# plt.title('Jr estimate over simulation')
+# plt.show()
+#
+# ind = 2
+# plt.plot(theta_est_save[:,ind,:].mean(axis=0),color='b',label='mean')
+# plt.plot(np.percentile(theta_est_save[:,ind,:],97.5,axis=0),color='b',linestyle='--',label='95% CI')
+# plt.plot(np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color='b',linestyle='--')
+# plt.axhline(Km_true,color='k',label='True')
+# plt.legend()
+# plt.xlabel('time step')
+# plt.title('Km estimate over simulation')
+# plt.show()
+#
+# ind = 3
+# plt.plot(theta_est_save[:,ind,:].mean(axis=0),color='b',label='mean')
+# plt.plot(np.percentile(theta_est_save[:,ind,:],97.5,axis=0),color='b',linestyle='--',label='95% CI')
+# plt.plot(np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color='b',linestyle='--')
+# plt.axhline(Rm_true,color='k',label='True')
+# plt.legend()
+# plt.xlabel('time step')
+# plt.title('Rm estimate over simulation')
+# plt.show()
+#
+# for result in mpc_result_save:
+#     print(result['epsilon'].max())

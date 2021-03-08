@@ -17,10 +17,10 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ###############################################################################
 
-""" This script runs simulation A) Pedagogical Example from the paper and saves the results """
-""" This script will take a fair amount of time to run if you have not installed cuda enabled JAX,
-    presaved results are included and can be plotted without running this script """
-""" The results can then be plotted using the script 'plot_single_state_demo.py' """
+""" This script plots the results from simulation A) Pedagogical Example """
+""" You can plot the results from the paper by running this script, otherwise
+    if you run 'single_state_mpc_demo.py' then you will generate new results which
+    will be plotted instead """
 
 # general imports
 import numpy as np
