@@ -25,21 +25,20 @@
 # general imports
 import pystan
 import numpy as np
-import matplotlib.pyplot as plt
-from helpers import plot_trace, col_vec, row_vec, suppress_stdout_stderr
+from helpers import col_vec, suppress_stdout_stderr
 from pathlib import Path
 import pickle
 from tqdm import tqdm
 
 # jax related imports
 import jax.numpy as jnp
-from jax import grad, jit, device_put, jacfwd, jacrev
+from jax import grad, jit, jacfwd, jacrev
 from jax.lax import scan
-from jax.ops import index, index_add, index_update
+from jax.ops import index, index_update
 from jax.config import config
 
 # optimisation module imports (needs to be done before the jax confix update)
-from optimisation import log_barrier_cost, solve_chance_logbarrier, log_barrier_cosine_cost
+from optimisation import solve_chance_logbarrier, log_barrier_cosine_cost
 
 config.update("jax_enable_x64", True)           # run jax in 64 bit mode for accuracy
 
@@ -48,50 +47,24 @@ config.update("jax_enable_x64", True)           # run jax in 64 bit mode for acc
 z_star = np.array([[0],[np.pi],[0.0],[0.0]],dtype=float)        # desired set point in z1
 Ns = 200             # number of samples we will use for MC MPC
 Nh = 25              # horizonline of MPC algorithm
-# sqc_v = np.array([1,10.0,1e-5,1e-5],dtype=float)            # cost on state error
-sqc_v = np.array([1,30.,1e-5,1e-5],dtype=float)
+sqc_v = np.array([1,30.,1e-5,1e-5],dtype=float) # cost on state error
 sqc = np.diag(sqc_v)
 src = np.array([[0.001]])
 
 # define the state constraints, (these need to be tuples)
 state_bound = 0.75*np.pi
 input_bound = 18.0
-# state_constraints = (lambda z: 0.75*np.pi - z[[0],:,:],lambda z: z[[0],:,:] + 0.75*np.pi)
-# # define the input constraints
-# input_constraints = (lambda u: 18. - u, lambda u: u + 18.)
 state_constraints = (lambda z: state_bound - z[[0],:,:],lambda z: z[[0],:,:] + state_bound)
 # define the input constraints
 input_constraints = (lambda u: input_bound - u, lambda u: u + input_bound)
 
-# run1: worked with 100, 2pi, and Nh=20, T=30
-# run2: worked with 80, pi, and Nh=25, T=50
-# run3: briefly stabilised with 60, pi, and NH=25, T=50
-# run4: stabilised with 100, 1.5*pi, and Nh = 25, T=50
-# run5: start fully down, same as above, stabilised
-# run6: stabilised +/-18, no constraints on arm angle, Nh=25, T=50
-# run7: stabilised +/-18 input, +/- pi on arm angle, Nh=25, T=50
-# run8: static hange start: +/-18 input, +/- pi on angle, NH=25. T=50. Stabilised
-# run9: as above but with +/- 0.75pi on angle, stabilised, start z1_0 at close to 0.75 pi
-# run10: proper static swing up, starting all around 0, proper constraints
-
-# start making the priors worse
-# run11: 10% prior mean error, 20% standard deviation
-# run12: same but definitely satisfies constraints with desired probability
-# run13: 25% prior mean error, 50% standard deviation
-# run14: 50% prior mean error, 100% standard deviation
 
 # simulation parameters
 # TODO: WARNING DONT MAKE T > 100 due to size of saved inv_metric
 T = 50             # number of time steps to simulate and record measurements for
 Ts = 0.025
-# z1_0 = 0.7*np.pi            # initial states
-# z1_0 = -0.7*np.pi            # initial states
-# z1_0 = np.pi - 0.05
 z1_0 = 0.0
-# z1_0 = 0.75*np.pi - 0.1
-# z2_0 = -np.pi/3
 z2_0 = 0.001
-# z2_0 = np.pi-0.1
 z3_0 = 0.0
 z4_0 = 0.0
 
@@ -413,8 +386,6 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
 
     uc_save[0, :, t] = uc[0,:]
 
-# plt.plot(theta_est_save[:,0,11])
-# plt.show()
 
 
 run = 'rotary_inverted_pendulum_demo_results'
@@ -434,104 +405,3 @@ with open('results/'+run+'/mpc_result_save100.pkl', 'wb') as file:
     pickle.dump(mpc_result_save, file)
 with open('results/'+run+'/uc_save100.pkl', 'wb') as file:
     pickle.dump(uc_save, file)
-#
-# plt.plot(u[0,:])
-# plt.title('MPC determined control action')
-# plt.axhline(input_bound, linestyle='--', color='r', linewidth=2, label='constraint')
-# plt.axhline(-input_bound, linestyle='--', color='r', linewidth=2, label='constraint')
-# plt.show()
-#
-# plt.subplot(2, 1, 1)
-# plt.plot(z_sim[0,0,:],label='True',color='k')
-# plt.plot(xt_est_save[:,0,:].mean(axis=0), color='b',label='mean')
-# plt.plot(np.percentile(xt_est_save[:,0,:],97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-# plt.plot(np.percentile(xt_est_save[:,0,:],2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-# plt.axhline(state_bound, linestyle='--', color='r', linewidth=2, label='constraint')
-# plt.axhline(-state_bound, linestyle='--', color='r', linewidth=2)
-# plt.ylabel('arm angle')
-# plt.legend()
-#
-# plt.subplot(2, 1, 2)
-# plt.plot(z_sim[1,0,:],label='True',color='k')
-# plt.plot(xt_est_save[:,1,:].mean(axis=0), color='b',label='mean')
-# plt.plot(np.percentile(xt_est_save[:,1,:],97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-# plt.plot(np.percentile(xt_est_save[:,1,:],2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-# plt.axhline(-z_star[1,0], linestyle='--', color='g', linewidth=2, label='target')
-# plt.ylabel('pendulum angle')
-# plt.legend()
-#
-# plt.show()
-#
-# # for t in range(T):
-# #     plt.plot(np.arange(Nh)+t,uc_save[0,:,t])
-# # plt.title('Control over horizon from each MPC solve')
-# # plt.show()
-#
-# if len(state_constraints) > 0:
-#     x_mpc = sim(xt, np.hstack([ut, uc]), w_mpc, theta_mpc)
-#     hx = np.concatenate([state_constraint(x_mpc[:, :, 1:]) for state_constraint in state_constraints], axis=2)
-#     cx = np.mean(hx > 0, axis=1)
-#     print('State constraint satisfaction')
-#     print(cx)
-# if len(input_constraints) > 0:
-#     cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints],axis=1)
-#     print('Input constraint satisfaction')
-#     print(cu >= 0)
-# #
-# for i in range(6):
-#     plt.subplot(2,3,i+1)
-#     plt.hist(x_mpc[1,:, i*4], label='MC forward sim')
-#     if i==1:
-#         plt.title('MPC solution over horizon')
-#     plt.axvline(z_star[1,0], linestyle='--', color='g', linewidth=2, label='target')
-#     plt.xlabel('t+'+str(i*4+1))
-# plt.tight_layout()
-# plt.legend()
-# plt.show()
-#
-#
-#
-# plt.plot(x_mpc[0,:,:].mean(axis=0))
-# plt.title('Predicted future arm angles')
-# plt.axhline(state_bound, linestyle='--', color='r', linewidth=2, label='constraint')
-# plt.axhline(-state_bound, linestyle='--', color='r', linewidth=2)
-# plt.show()
-#
-# plt.plot(x_mpc[1,:,:].mean(axis=0))
-# plt.axhline(z_star[1,0], linestyle='--', color='g', linewidth=2, label='target')
-# plt.title('Predicted future pendulum angles')
-# plt.show()
-#
-#
-# ind = 0
-# plt.plot(theta_est_save[:,ind,:].mean(axis=0),color='b',label='mean')
-# plt.plot(np.percentile(theta_est_save[:,ind,:],97.5,axis=0),color='b',linestyle='--',label='95% CI')
-# plt.plot(np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color='b',linestyle='--')
-# plt.axhline(Jr_true,color='k',label='True')
-# plt.legend()
-# plt.xlabel('time step')
-# plt.title('Jr estimate over simulation')
-# plt.show()
-#
-# ind = 2
-# plt.plot(theta_est_save[:,ind,:].mean(axis=0),color='b',label='mean')
-# plt.plot(np.percentile(theta_est_save[:,ind,:],97.5,axis=0),color='b',linestyle='--',label='95% CI')
-# plt.plot(np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color='b',linestyle='--')
-# plt.axhline(Km_true,color='k',label='True')
-# plt.legend()
-# plt.xlabel('time step')
-# plt.title('Km estimate over simulation')
-# plt.show()
-#
-# ind = 3
-# plt.plot(theta_est_save[:,ind,:].mean(axis=0),color='b',label='mean')
-# plt.plot(np.percentile(theta_est_save[:,ind,:],97.5,axis=0),color='b',linestyle='--',label='95% CI')
-# plt.plot(np.percentile(theta_est_save[:,ind,:],2.5,axis=0),color='b',linestyle='--')
-# plt.axhline(Rm_true,color='k',label='True')
-# plt.legend()
-# plt.xlabel('time step')
-# plt.title('Rm estimate over simulation')
-# plt.show()
-#
-# for result in mpc_result_save:
-#     print(result['epsilon'].max())
