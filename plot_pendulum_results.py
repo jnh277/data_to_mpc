@@ -54,17 +54,10 @@ input_constraints = (lambda u: input_bound - u, lambda u: u + input_bound)
 
 
 # simulation parameters
-# TODO: WARNING DONT MAKE T > 100 due to size of saved inv_metric
 T = 50             # number of time steps to simulate and record measurements for
 Ts = 0.025
-# z1_0 = 0.7*np.pi            # initial states
-# z1_0 = -0.7*np.pi            # initial states
-# z1_0 = np.pi - 0.05
 z1_0 = 0.0
-# z1_0 = 0.75*np.pi - 0.1
-# z2_0 = -np.pi/3
 z2_0 = 0.001
-# z2_0 = np.pi-0.1
 z3_0 = 0.0
 z4_0 = 0.0
 
@@ -158,10 +151,6 @@ def rk4(xt, ut, theta):
 def pend_simulate(xt, u, w,
                   theta):  # w is expected to be 3D. xt is expected to be 2D. ut is expected to be 2d but also, should handle being a vector (3d)
     [Nx, Ns, Np1] = w.shape
-    # if u.ndim == 2:  # conditional checks might slow jax down
-    #     Nu = u.shape[1]
-    # if Nu != Np1:
-    #     print('wyd??')
     x = jnp.zeros((Nx, Ns, Np1 + 1))
     x = index_update(x, index[:, :, 0], xt)
     for ii in range(Np1):
