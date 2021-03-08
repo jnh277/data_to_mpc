@@ -165,7 +165,7 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
     u[t+1] = uc[0,0]
 
 
-run = 'single_state_demo_results2'
+run = 'single_state_demo_results'
 with open('results/'+run+'/xt_est_save.pkl','wb') as file:
     pickle.dump(xt_est_save, file)
 with open('results/'+run+'/a_est_save.pkl','wb') as file:
