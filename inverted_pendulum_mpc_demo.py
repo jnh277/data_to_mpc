@@ -1,22 +1,23 @@
-"""
-Simulate a nonlinear inverted pendulum (QUBE SERVO 2)
-with independent process and measurement noise
+###############################################################################
+#    Data to Controller for Nonlinear Systems: An Approximate Solution
+#    Copyright (C) 2021  Johannes Hendriks < johannes.hendriks@newcastle.edu.a >
+#    and James Holdsworth < james.holdsworth@newcastle.edu.au >
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+###############################################################################
 
-TODO: UPDATE THIS INFO
-
-GOAL:
-Use a Monte Carlo style approach to perform MPC where the state constraints are satisfied
-with a given probability.
-
-Current set up: Uses MC to give an expected cost and then satisfies,
-Chance state constraints using a log barrier formulation
-Chance state constraints using a log barrier formulation
-Input constraints using a log barrier formulation
-
-Implementation:
-Uses custom newton method to solve
-Uses JAX to compile and run code on GPU/CPU and provide gradients and hessians
-"""
+# TODO: script description
 
 # general imports
 import pystan

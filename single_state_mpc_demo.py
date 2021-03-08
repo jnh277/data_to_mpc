@@ -1,39 +1,38 @@
-"""
-Simulate a first order state space model given by
-x_{t+1} = a*x_t + b*u_t + w_t
-y_t = x_t + e_t
-with q and r the standard deviations of w_t and q_t respectively
+###############################################################################
+#    Data to Controller for Nonlinear Systems: An Approximate Solution
+#    Copyright (C) 2021  Johannes Hendriks < johannes.hendriks@newcastle.edu.a >
+#    and James Holdsworth < james.holdsworth@newcastle.edu.au >
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+###############################################################################
 
-Jointly estimate the smoothed state trajectories and parameters theta = {a, b, q, r}
-to give p(x_{1:T}, theta | y_{1:T})
-
-GOAL:
-Use a Monte Carlo style approach to perform MPC where the state constraints are satisfied
-with a given probability.
-
-Current set up: Uses MC to give an expected cost and then satisfies,
-Chance state constraints using a log barrier formulation
-Chance state constraints using a log barrier formulation
-Input constraints using a log barrier formulation
-
-Implementation:
-Uses custom newton method to solve
-Uses JAX to compile and run code on GPU/CPU and provide gradients and hessians
-"""
+""" This script runs simulation A) Pedagogical Example from the paper and saves the results """
+""" This overwrites the preincluded results that match the paper plots """
+""" The results can then be plotted using the script 'plot_single_state_demo.py' """
 
 # general imports
 import pystan
 import numpy as np
-import matplotlib.pyplot as plt
-from helpers import plot_trace, col_vec, row_vec, suppress_stdout_stderr
+from helpers import col_vec, suppress_stdout_stderr
 from pathlib import Path
 import pickle
 from tqdm import tqdm
 
 # jax related imports
 import jax.numpy as jnp
-from jax import grad, jit, device_put, jacfwd, jacrev
-from jax.ops import index, index_add, index_update
+from jax import grad, jit,  jacfwd, jacrev
+from jax.ops import index, index_update
 from jax.config import config
 
 # optimisation module imports (needs to be done before the jax confix update)
@@ -51,7 +50,7 @@ src = np.array([[0.01]])             # square root cost on control action
 delta = 0.05                        # desired maximum probability of not satisfying the constraint
 
 x_ub = 1.2
-u_ub = 3.
+u_ub = 2.
 state_constraints = (lambda x: x_ub - x,)
 input_constraints = (lambda u: u_ub - u,)
 
@@ -93,10 +92,8 @@ def simulate(xt, u, w, theta):
     b = theta['b']
     [o, M, N] = w.shape
     x = jnp.zeros((o, M, N+1))
-    # x[:, 0] = xt
     x = index_update(x, index[:, :,0], xt)
     for k in range(N):
-        # x[:, k+1] = a * x[:, k] + b * u[k] + w[:, k]
         x = index_update(x, index[:, :, k+1], a * x[:, :, k] + b * u[:, k] + w[:, :, k])
     return x[:, :, 1:]
 
@@ -111,6 +108,7 @@ a_est_save = np.zeros((M,T))
 b_est_save = np.zeros((M,T))
 q_est_save = np.zeros((M,T))
 r_est_save = np.zeros((M,T))
+mpc_result_save = []
 ### SIMULATE SYSTEM AND PERFORM MPC CONTROL
 for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control'):
     # simulate system
@@ -162,61 +160,25 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
     result = solve_chance_logbarrier(np.zeros((1, N)), cost, gradient, hessian, ut, xt, theta, w, x_star, sqc, src,
                                      delta, simulate, state_constraints, input_constraints, verbose=False)
 
+    mpc_result_save.append(result)
     uc = result['uc']
     u[t+1] = uc[0,0]
 
 
-plt.subplot(2,1,1)
-plt.plot(x,label='True', color='k')
-plt.plot(xt_est_save[0,:,:].mean(axis=0), color='b',label='mean')
-plt.plot(np.percentile(xt_est_save[0,:,:],97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-plt.plot(np.percentile(xt_est_save[0,:,:],2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-plt.ylabel('x')
-plt.axhline(x_ub,linestyle='--',color='r',linewidth=2.,label='constraint')
-plt.axhline(x_star,linestyle='--',color='g',linewidth=2.,label='target')
-plt.legend()
-
-plt.subplot(2,1,2)
-plt.plot(u)
-plt.axhline(u_ub,linestyle='--',color='r',linewidth=2.,label='constraint')
-plt.ylabel('u')
-plt.xlabel('t')
-
-plt.tight_layout()
-plt.show()
-
-plt.subplot(2,2,1)
-plt.plot(a_est_save.mean(axis=0),label='mean')
-plt.plot(np.percentile(a_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-plt.plot(np.percentile(a_est_save,2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-plt.ylabel('a')
-plt.axhline(0.9,linestyle='--',color='k',linewidth=2.,label='true')
-plt.legend()
-
-plt.subplot(2,2,2)
-plt.plot(b_est_save.mean(axis=0),label='mean')
-plt.plot(np.percentile(b_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-plt.plot(np.percentile(b_est_save,2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-plt.ylabel('b')
-plt.axhline(0.1,linestyle='--',color='k',linewidth=2.,label='true')
-plt.legend()
-
-plt.subplot(2,2,3)
-plt.plot(q_est_save.mean(axis=0),label='mean')
-plt.plot(np.percentile(q_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-plt.plot(np.percentile(q_est_save,2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-plt.ylabel('q')
-plt.axhline(q_true,linestyle='--',color='k',linewidth=2.,label='true')
-plt.legend()
-plt.xlabel('t')
-
-plt.subplot(2,2,4)
-plt.plot(r_est_save.mean(axis=0),label='mean')
-plt.plot(np.percentile(r_est_save,97.5,axis=0), color='b',linestyle='--',linewidth=0.5,label='95% CI')
-plt.plot(np.percentile(r_est_save,2.5,axis=0), color='b',linestyle='--',linewidth=0.5)
-plt.ylabel('r')
-plt.axhline(r_true,linestyle='--',color='k',linewidth=2.,label='true')
-plt.legend()
-plt.xlabel('t')
-
-plt.show()
+run = 'single_state_demo_results2'
+with open('results/'+run+'/xt_est_save.pkl','wb') as file:
+    pickle.dump(xt_est_save, file)
+with open('results/'+run+'/a_est_save.pkl','wb') as file:
+    pickle.dump(a_est_save, file)
+with open('results/'+run+'/b_est_save.pkl','wb') as file:
+    pickle.dump(b_est_save, file)
+with open('results/'+run+'/q_est_save.pkl','wb') as file:
+    pickle.dump(q_est_save, file)
+with open('results/'+run+'/r_est_save.pkl','wb') as file:
+    pickle.dump(r_est_save, file)
+with open('results/'+run+'/u.pkl','wb') as file:
+    pickle.dump(u, file)
+with open('results/'+run+'/x.pkl','wb') as file:
+    pickle.dump(x, file)
+with open('results/'+run+'/mpc_result_save.pkl', 'wb') as file:
+    pickle.dump(mpc_result_save, file)
