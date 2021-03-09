@@ -154,7 +154,6 @@ def rk4(xt, ut, theta):
     k4 = qube_gradient(xt + k3 * h, ut, theta)
     return xt + (k1 / 6 + k2 / 3 + k3 / 3 + k4 / 6) * h  # should handle a 2D x just fine
 
-# @jit
 def pend_simulate(xt, u, w,
                   theta):  # w is expected to be 3D. xt is expected to be 2D. ut is expected to be 2d but also, should handle being a vector (3d)
     [Nx, Ns, Np1] = w.shape
@@ -167,8 +166,7 @@ def pend_simulate(xt, u, w,
         'w':w,
         'theta':theta
     }
-    dict,_ = scan(scan_func,dict,iis)
-    
+    dict,_ = scan(scan_func,dict,iis) # carry, ys = scan(scan_func,dict,iis). for each ii in iis, runs dict,y = scan_func(dict,ii) and ys = ys.append(y)
     return dict['x'][:, :, 1:]  # return everything except xt
 
 def scan_func(carry,ii):
