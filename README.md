@@ -4,7 +4,7 @@ Companion code to the paper
 
 Title: Data  to  Controller  for  Nonlinear  Systems:  An  Approximate  Solution
 
-Authors: Johannes N. Hendriks, James R. Z. Holdsworth, Adrian G. Wills, Thomas B. Sch\"{o}n and Brett Ninness
+Authors: Johannes N. Hendriks, James R. Z. Holdsworth, Adrian G. Wills, Thomas B. Schön and Brett Ninness
 
 Submitted to the 2021 Control Design Conference
 
@@ -21,7 +21,7 @@ dimensional deterministic optimisation problems. The proposed approach is demons
  
 This git repository contains code to run the two simulations given in the paper and to plot the results.
 
-## Simualtion A) Pedagogical Example
+## Simulation A) Pedagogical Example
 
 Demonstrates the data to controller approach on a simulated single state system with input and output constraints. 
 A more detailed description of the simulation is given in the paper.
