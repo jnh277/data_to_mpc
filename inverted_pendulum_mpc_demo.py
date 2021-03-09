@@ -175,8 +175,7 @@ def scan_func(carry,ii):
     carry['x'] = index_update(carry['x'], index[:, :, ii + 1], rk4(carry['x'][:, :, ii], carry['u'][:, ii], carry['theta']) + carry['w'][:, :, ii])
     return carry, []
 
-# compile cost and create gradient and hessian functions
-sim = jit(pend_simulate)  # static argnums means it will recompile if N changes
+sim = jit(pend_simulate)
 
 # Pack true parameters
 theta_true = fill_theta(theta_true)
