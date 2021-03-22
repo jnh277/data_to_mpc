@@ -1,7 +1,27 @@
 
+###############################################################################
+#    Data to Controller for Nonlinear Systems: An Approximate Solution
+#    Copyright (C) 2021  Johannes Hendriks < johannes.hendriks@newcastle.edu.a >
+#    and James Holdsworth < james.holdsworth@newcastle.edu.au >
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+###############################################################################
+""" Optimisation cost function and solver """
+
 import numpy as np
 import jax.numpy as jnp
-from jax import grad, jit, device_put, jacfwd, jacrev
+from jax import device_put
 from jax.scipy.special import expit
 
 from helpers import row_vec

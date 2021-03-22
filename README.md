@@ -1,24 +1,76 @@
 # data_to_mpc
 
+Companion code to the paper 
 
-Project requirements listed in requirements.txt
+Title: Data  to  Controller  for  Nonlinear  Systems:  An  Approximate  Solution
 
-to create a new requirements file the following command can be run
+Authors: Johannes N. Hendriks, James R. Z. Holdsworth, Adrian G. Wills, Thomas B. Schön and Brett Ninness
 
-pip freeze > requirements.txt
+Submitted to the 2021 Control Design Conference
 
-Note that this will add everything on your python path as == requirements
+## Paper Abstract
 
-To install these requirements run
+This paper considers the problem of determining an optimal control action based on observed data. 
+We formulate the  problem  assuming  that  the  system  can  be  modelled  by  a nonlinear state-space model, 
+but where the model parameters,state and future disturbances are not known and are treated as random variables. 
+Central to our formulation is that the joint distribution  of  these  unknown  objects  is  conditioned  on  the
+observed  data.  Crucially,  as  new  measurements  become  avail-able,  this  joint  distribution  continues  to  
+evolve  so  that  control decisions are made accounting for uncertainty as evidenced in the data. 
+The resulting problem is intractable which we obviate by  providing  approximations  that  result  in  finite  
+dimensional deterministic optimisation problems. The proposed approach is demonstrated  in  simulation  on  a  nonlinear  system.
+ 
+This git repository contains code to run the two simulations given in the paper and to plot the results.
 
-pip install -r requirements.txt
+## Simulation A) Pedagogical Example
 
-# Notes
-For the CPU-only install, it is sufficient to run `pip install jax jaxlib`, or `pip install -r requirements.txt`. This is enough to run the code.
+Demonstrates the data to controller approach on a simulated single state system with input and output constraints. 
+A more detailed description of the simulation is given in the paper.
 
-For the Jax+CUDA install, the CUDA drivers and cuDNN need to be installed. Jaxlib for a particular CUDA version can be installed afterwards.
+Presaved results corresponding to the plots shown in the paper can be plotted by running 
 
-Python version should be less than 3.9.0 -- versions at 3.9.0 or above may work.
+```
+python plot_single_state_demo.py
+```
+
+Alternatively, a new simulation can be run (will then overwrite these results) using
+
+```
+python single_state_mpc_demo.py
+```
+
+Warning, if you do not have CUDA enabled JAX then this will take a long time to run and it is recommended you plot the 
+presaved results.
+
+## Simulation B) Rotary Inverted Pendulum
+Demonstrates the data to controller approach on a simulated rotary inverted pendulum system with input and output
+constraints. A more detailed description of the simulation is given in the paper.
+
+Presaved results corresponding to the plots shown in the paper can be plotted by running 
+
+```
+python plot_pendulum_results.py
+```
+
+Alternatively, a new simulation can be run (will then overwrite these results) using
+
+```
+python inverted_pendulum_mpc_demo.py
+```
+Warning, if you do not have CUDA enabled JAX then this will take a very long time to run and it is recommended you plot the 
+presaved results.
+
+## Requirements
+
+A list of requirements is given in requirements.txt and can be installed by running the command 
+
+```
+pip install -r requirements.txt 
+```
+
+Note that this installs the CPU version of jaxlib, which will be adequate for plotting the results. However, if you would like
+to rerun any of the simulations it is strongly recommended that you install CUDA, cuDNN, and the CUDA version of jaxlib. 
+Some minimal instructions and additional resources for completing these installations is given below.
+
 
 # Installing CUDA, cuDNN and jax/jaxlib on Linux
 
@@ -53,19 +105,19 @@ Then run:
 ```shell
 sudo update-initramfs -u
 ```
-Nothing will happen until reboot. After reboot there should be no output from `lsmod | grep nouveau`. 
+After reboot there should be no output from `lsmod | grep nouveau`. 
 
 Once Nouveau is disabled, reboot into console mode/text. For distros using `systemd` including Ubuntu >= 15.04 this can be achieved by running:
 ```shell
 sudo systemctl set-default multi-user.target
 ```
-After this is run, the command `systemctl get-default` should return `multi-user.target`. This will prevent the GUI from loading on next boot. Reboot the computer.
+After this is run, the command `systemctl get-default` should return `multi-user.target`. This will prevent the GUI from loading on boot. Reboot the computer.
 
-After reboot, log in and navigate to the directory where the runfile was downloaded. Run the file, for the 11.1.0 runfile downloaded previously:
+After reboot, log in and navigate to the directory where the runfile was downloaded. Run the file, for the 11.1.0 file downloaded previously run:
 ```shell
 sudo sh cuda_11.1.0_455.23.05_linux.run
 ```
-After some time an EULA will appear. It may be poorly scaled, type `accept` and hit enter to accept the terms. The next menu should be some installation settings. The default settings are fine. Keep the samples selected as they are useful for validation. Start the installation.
+After some time an EULA will appear. It may be poorly scaled, type `accept` and hit enter to accept the terms. The next menu should be some installation settings, the default settings are fine. Keep the samples selected as they are useful for validation. Start the installation.
 
 After install these lines need to be added to `~/.bashrc` or equivalent. Run:
 ```shell

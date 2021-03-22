@@ -1,6 +1,7 @@
 ###############################################################################
-#    Practical Bayesian Linear System Identification using Hamiltonian Monte Carlo
-#    Copyright (C) 2020  Johannes Hendriks < johannes.hendriks@newcastle.edu.a >
+#    Data to Controller for Nonlinear Systems: An Approximate Solution
+#    Copyright (C) 2021  Johannes Hendriks < johannes.hendriks@newcastle.edu.a >
+#    and James Holdsworth < james.holdsworth@newcastle.edu.au >
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
