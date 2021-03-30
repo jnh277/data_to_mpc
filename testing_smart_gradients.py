@@ -23,7 +23,7 @@ x_star = np.array([1.0])        # desired set point
 M = 200                             # number of samples we will use for MC MPC
 N = 5                              # horizonline of MPC algorithm
 sqc = np.array([[1.0]])             # square root cost on state error
-src = np.array([[0.01]])             # square root cost on control action
+src = np.array([[0.5]])             # square root cost on control action
 delta = 0.05                        # desired maximum probability of not satisfying the constraint
 
 x_ub = 1.2
@@ -135,22 +135,91 @@ theta = {'a': a,
 
 
 Nu = 1
-uc = np.zeros((Nu, N))
+uc = np.ones((Nu, N))
+ncx = 1
+o = 1
+epsilon = np.ones((N * ncx,))
+z = np.hstack([uc.flatten(), epsilon])
+x_star = 2.*np.ones((o,1))
 
+""" Things we wish to replicate """
+def complete_cost(z, xt, ut, w, theta, x_star,sqc,src, Nu, N, ncx, o):
+    uc = jnp.reshape(z[:Nu*N], (Nu, N))                 # control input variables  #,
+    epsilon = z[Nu*N:N*Nu+ncx*N]                        # slack variables on state constraints
+
+    u = jnp.hstack([ut, uc]) # u_t was already performed, so uc is the next N control actions
+    x = simulate(xt, u, w, theta)
+    V = jnp.sum(jnp.matmul(sqc, jnp.reshape(x[:, :, 1:] - jnp.reshape(x_star, (o, 1, -1)), (o, -1))) ** 2) \
+        + 0.5*jnp.sum(jnp.matmul(src, uc) ** 2) + 0.5*jnp.sum(300 * (epsilon + 1e3) ** 2)
+    return V
+
+V = complete_cost(z, xt, ut, w, theta, x_star, sqc, src, Nu, N, ncx, o)
+
+# compute dVdz
+grad_complete_cost = grad(complete_cost, argnums=0)
+dVdz = grad_complete_cost(z, xt, ut, w, theta, x_star, sqc, src, Nu, N, ncx, o)
+dVdu = dVdz[:N*Nu]
+
+# hessian
+hessian_complete_cost = jacfwd(jacrev(complete_cost, argnums=0))
+H = hessian_complete_cost(z, xt, ut, w, theta, x_star, sqc, src, Nu, N, ncx, o)
+Hu = H[:N*Nu,:N*Nu]
+
+""" how we are going to replicate them by breaking them up """
 # create a wrapper around simulate that adds in u_t and takes flat uc
-def simulate_wrapper(xt, ut, uc_flat, w, theta, Nu, N):
-    uc = jnp.reshape(uc_flat, (Nu, N))  # control input variables  #,
+def simulate_wrapper(uc_bar, xt, ut, w, theta, Nu, N):
+    uc = jnp.reshape(uc_bar, (Nu, N))  # control input variables  #,
     u = jnp.hstack([ut, uc])  # u_t was already performed, so uc is the next N control actions
     x = simulate(xt, u, w, theta)
-    return x
+    xbar = x.flatten()
+    return xbar
 
-# def cost(vars, )
+dxdu_func = jacfwd(simulate_wrapper, argnums=0)
+# dxdu_func = jit(jacfwd(simulate_wrapper, argnums=0),static_argnums=(5,6))
 
-# the gradient of xbar with respect to inputs u
-dxdu_func = jit(jacfwd(simulate_wrapper, argnums=0))
+xbar = simulate_wrapper(uc.flatten(), xt, ut, w, theta, Nu, N)      # The simulated x trajectory
+dxdu = dxdu_func(uc.flatten(), xt, ut, w, theta, Nu, N)             # gradient trajectory wrt uc
 
-dxdu = dxdu_func(xt, ut, uc.flatten(), w, theta, Nu, N)
+def cost(xbar, uc_bar, x_star, sqc, src, o,M,N,Nu):
+    x = jnp.reshape(xbar,(o,M,N+1))
+    uc = jnp.reshape(uc_bar, (Nu, N))  # control input variables  #,
+    V = jnp.sum(jnp.matmul(sqc, jnp.reshape(x[:, :, 1:] - jnp.reshape(x_star, (o, 1, -1)), (o, -1))) ** 2) \
+        + 0.5*jnp.sum(jnp.matmul(src, uc) ** 2)
 
+    return V
+
+def cost_epsilon(epsilon):
+    return 0.5*jnp.sum(300 * (epsilon + 1e3) ** 2)
+
+def grad_cost_epsilon(epsilon):
+    return 300*(epsilon + 1e3)
+
+def hess_cost_epsilon(N,ncx):
+    return 300*np.eye(N*ncx)
+
+V2 = cost(xbar, uc.flatten(),x_star, sqc, src, o,M,N,Nu) + cost_epsilon(epsilon)
+
+dVdxu_func = grad(cost, argnums=(0,1))
+dVdxu = dVdxu_func(xbar, uc.flatten(), x_star, sqc, src, o,M,N,Nu)
+
+dVdu_2 = dVdxu[0] @ dxdu + dVdxu[1]
+
+dVdz_2 = np.hstack([dVdu, grad_cost_epsilon(epsilon)])
+
+# hessian
+d2xdu2_func = jacfwd(jacrev(simulate_wrapper, argnums=0))
+d2xdu2 = d2xdu2_func(uc.flatten(), xt, ut, w, theta, Nu, N)
+d2Vdxu2_func = jacfwd(jacrev(cost, argnums=(0,1)),argnums=(0,1))
+d2Vdxu2 = d2Vdxu2_func(xbar, uc.flatten(), x_star, sqc, src, o,M,N,Nu)
+
+# d2Vdu2p_func = jacfwd(jacrev(cost, argnums=(0)))
+# d2Vd = d2Vdx2_func(xbar, uc.flatten(), x_star, sqc, src, o,M,N,Nu)
+
+Hu_2 = d2Vdxu2[1][1] + d2xdu2.T @ dVdxu[0] + dxdu.T @ d2Vdxu2[0][0] @ dxdu
+Heps_2 = hess_cost_epsilon(N, ncx)
+H_2 = np.zeros((N*Nu+N*ncx,N*Nu+N*ncx))
+H_2[:N*Nu,:N*Nu] = Hu_2
+H_2[N*Nu:,N*Nu:] = Heps_2
 # define MPC cost, gradient and hessian function
 # cost = jit(log_barrier_cost, static_argnums=(11,12,13, 14, 15))  # static argnums means it will recompile if N changes
 # gradient = jit(grad(log_barrier_cost, argnums=0), static_argnums=(11, 12, 13, 14, 15))    # get compiled function to return gradients with respect to z (uc, s)

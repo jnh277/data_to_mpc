@@ -25,7 +25,7 @@ from jax.scipy.special import expit
 # optimisation module imports (needs to be done before the jax confix update)
 from optimisation import solve_chance_logbarrier, log_barrier_cosine_cost
 import time
-import osqp
+# import osqp
 from scipy import sparse
 config.update("jax_enable_x64", True)           # run jax in 64 bit mode for accuracy
 
@@ -75,7 +75,7 @@ def merit_function(z, w, inv_mu, gamma):
 
 
 Hfunc = jit(jacfwd(jacrev(lagrangian, argnums=0)))
-ddFfunc = jit(jacfwd(jacrev(cost, argnums=0)))
+# ddFfunc = jit(jacfwd(jacrev(cost, argnums=0)))
 Ffunc = jit(cost)
 dFfunc = jit(grad(cost, argnums=0))
 dCfunc = jit(jacfwd(constraint, argnums=0))
@@ -162,12 +162,15 @@ for i in range(30):
     inv_mu = np.max(np.abs(eta)) + 10
 
     c = merit_function(z, w, inv_mu, gamma)
+    cind = constraint(z, w, gamma)
     alpha = 1.0
     for k in range(52):
         ztest = z + alpha * p
         ctest = merit_function(ztest, w, inv_mu, gamma)
+        cun = dC.T @ ztest + C
         # if np.isnan(ctest) or np.isinf(ctest): nan and inf checks should be redundant
-        if ctest < c:  # #todo first wolfe condition
+        # if ctest < c:  # #
+        if ctest < c + 0.01 * alpha * (nd - inv_mu * np.sum(np.minimum(cun,0))):    # check this is correct?
             z = ztest
             lams = device_put(eta)
 
