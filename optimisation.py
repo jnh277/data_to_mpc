@@ -91,7 +91,7 @@ def log_barrier_cost(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, gamma, si
     ncx = len(state_constraints)    # number of state constraints
 
     o = w.shape[0]
-    uc = jnp.reshape(z[:Nu*N], (Nu, N))              # control input variables  #,
+    uc = jnp.reshape(z[:Nu*N], (Nu, N))                 # control input variables  #,
     epsilon = z[Nu*N:N*Nu+ncx*N]                        # slack variables on state constraints
 
     u = jnp.hstack([ut, uc]) # u_t was already performed, so uc is the next N control actions
@@ -216,7 +216,7 @@ def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_st
             # calculate newton decrement
             nd = np.dot(p,g)
             # check that we have a valid search direction and if not then fix
-            if nd >= -1e-8:
+            if nd >= -1e-8:         # h was probably not positive definite so this gives a positive definite version close to it
                 [d, v] = np.linalg.eig(h)
                 if np.iscomplex(d).any():       # stop complex eigenvalues
                     d = np.real(d)
