@@ -4,6 +4,7 @@ import numpy as np
 from helpers import col_vec, suppress_stdout_stderr
 from pathlib import Path
 import pickle
+from jax.scipy.special import expit
 from tqdm import tqdm
 
 # jax related imports
@@ -13,8 +14,6 @@ from jax.ops import index, index_update
 from jax.config import config
 
 # optimisation module imports (needs to be done before the jax confix update)
-from optimisation import log_barrier_cost, solve_chance_logbarrier
-
 config.update("jax_enable_x64", True)           # run jax in 64 bit mode for accuracy
 
 
@@ -126,13 +125,6 @@ ut = np.expand_dims(np.array([u[t]]), 0)  # control action that was just applied
 theta = {'a': a,
          'b': b, }
 
-# save some things for later plotting
-# xt_est_save[0,:,t] = z[:, -1]
-# a_est_save[:, t] = a
-# b_est_save[:, t] = b
-# q_est_save[:, t] = q
-# r_est_save[:, t] = r
-
 
 Nu = 1
 uc = np.ones((Nu, N))
@@ -202,8 +194,10 @@ V2 = cost(xbar, uc.flatten(),x_star, sqc, src, o,M,N,Nu) + cost_epsilon(epsilon)
 dVdxu_func = grad(cost, argnums=(0,1))
 dVdxu = dVdxu_func(xbar, uc.flatten(), x_star, sqc, src, o,M,N,Nu)
 
+# d cost with respect to u
 dVdu_2 = dVdxu[0] @ dxdu + dVdxu[1]
 
+# d cost with respect to u and eps
 dVdz_2 = np.hstack([dVdu, grad_cost_epsilon(epsilon)])
 
 # hessian
@@ -215,11 +209,108 @@ d2Vdxu2 = d2Vdxu2_func(xbar, uc.flatten(), x_star, sqc, src, o,M,N,Nu)
 # d2Vdu2p_func = jacfwd(jacrev(cost, argnums=(0)))
 # d2Vd = d2Vdx2_func(xbar, uc.flatten(), x_star, sqc, src, o,M,N,Nu)
 
+# dd cost with respect to u
 Hu_2 = d2Vdxu2[1][1] + d2xdu2.T @ dVdxu[0] + dxdu.T @ d2Vdxu2[0][0] @ dxdu
+
+# dd cost with respect to eps
 Heps_2 = hess_cost_epsilon(N, ncx)
+
+# dd cost with respect to u and eps
 H_2 = np.zeros((N*Nu+N*ncx,N*Nu+N*ncx))
 H_2[:N*Nu,:N*Nu] = Hu_2
 H_2[N*Nu:,N*Nu:] = Heps_2
+
+# gradients of constraints
+gamma = 0.1
+
+def chance_constraint(hu, epsilon, gamma):    # Pr(h(u) >= 0 ) >= (1-epsilon)
+    return jnp.mean(expit(hu / gamma), axis=1) - (1 - epsilon)     # take the sum over the samples (M)
+#
+# simulate and calculate state constraint with respect to u and epsilon
+def complete_constraint_calc(z, xt, ut, w, theta, gamma, state_constraints, Nu, N, ncx):
+    uc = jnp.reshape(z[:Nu * N], (Nu, N))  # control input variables  #,
+    epsilon = z[Nu * N:N * Nu + ncx * N]  # slack variables on state constraints
+
+    u = jnp.hstack([ut, uc])  # u_t was already performed, so uc is the next N control actions
+    x = simulate(xt, u, w, theta)
+
+    hx = jnp.concatenate([state_constraint(x[:, :, 1:]) for state_constraint in state_constraints], axis=2)
+    cx = chance_constraint(hx, epsilon, gamma).flatten()
+    return cx
+
+dCfunc = jacfwd(complete_constraint_calc,argnums=0)
+
+C_check = complete_constraint_calc(z, xt, ut, w, theta, gamma, state_constraints, Nu, N, ncx)
+dC_check = dCfunc(z, xt, ut, w, theta, gamma, state_constraints, Nu, N, ncx)
+
+def state_constraint_wrapper(xbar, epsilon, gamma, state_constraints, o, M, N):
+    x = jnp.reshape(xbar, (o, M, N + 1))
+    hx = jnp.concatenate([state_constraint(x[:, :, 1:]) for state_constraint in state_constraints], axis=2)
+    cx = chance_constraint(hx, epsilon, gamma).flatten()
+    return cx
+
+dCdxepsfunc = jacfwd(state_constraint_wrapper, argnums=(0,1))
+
+dCdxeps = dCdxepsfunc(xbar, epsilon, gamma, state_constraints, o, M, N)
+
+dC = np.concatenate([dCdxeps[0] @ dxdu, dCdxeps[1]],axis=1)
+
+np.max(np.abs(dC - dC_check))
+
+# Lagrangian and its second derivative
+def complete_lagrangian(z, lams, xt, ut, w, theta, x_star, sqc, src, state_constraints, Nu, N, ncx, o):
+    uc = jnp.reshape(z[:Nu * N], (Nu, N))  # control input variables  #,
+    epsilon = z[Nu * N:N * Nu + ncx * N]  # slack variables on state constraints
+
+    u = jnp.hstack([ut, uc])  # u_t was already performed, so uc is the next N control actions
+    x = simulate(xt, u, w, theta)
+    V = jnp.sum(jnp.matmul(sqc, jnp.reshape(x[:, :, 1:] - jnp.reshape(x_star, (o, 1, -1)), (o, -1))) ** 2) \
+        + 0.5 * jnp.sum(jnp.matmul(src, uc) ** 2) + 0.5 * jnp.sum(300 * (epsilon + 1e3) ** 2)
+
+    hx = jnp.concatenate([state_constraint(x[:, :, 1:]) for state_constraint in state_constraints], axis=2)
+    cx = chance_constraint(hx, epsilon, gamma).flatten()
+
+    L = V - np.sum(lams * cx)
+    return L
+
+lams = np.ones((5,))
+
+
+
+L = complete_lagrangian(z, lams, xt, ut, w, theta, x_star, sqc, src, state_constraints, Nu, N, ncx, o)
+
+def lams_constraints(z, lams, xt, ut, w, theta, state_constraints, Nu, N, ncx):
+    uc = jnp.reshape(z[:Nu * N], (Nu, N))  # control input variables  #,
+    epsilon = z[Nu * N:N * Nu + ncx * N]  # slack variables on state constraints
+
+    u = jnp.hstack([ut, uc])  # u_t was already performed, so uc is the next N control actions
+    x = simulate(xt, u, w, theta)
+
+    hx = jnp.concatenate([state_constraint(x[:, :, 1:]) for state_constraint in state_constraints], axis=2)
+    cx = chance_constraint(hx, epsilon, gamma).flatten()
+    return np.sum(lams * cx)
+
+
+ddlamCfunc = jacfwd(jacrev(lams_constraints,argnums=0))
+
+d2lamC_check = ddlamCfunc(z, lams, xt, ut, w, theta, state_constraints, Nu, N, ncx)
+
+d2Cdx2func = jacfwd(jacrev(state_constraint_wrapper,argnums=0),argnums=0)
+
+d2Cdx2 = d2Cdx2func(xbar, epsilon, gamma, state_constraints, o, M, N)
+
+test = dxdu.T @ np.sum(np.reshape(lams,(-1,1,1))*d2Cdx2,axis=0) @ dxdu
+test2 = (lams @ dCdxeps[0]) @ d2xdu2.transpose((2,0,1))
+d2lamC_11 = dxdu.T @ np.sum(np.reshape(lams,(-1,1,1))*d2Cdx2,axis=0) @ dxdu + (lams @ dCdxeps[0]) @ d2xdu2.transpose((2,0,1))
+d2lamC = np.vstack((np.hstack((d2lamC_11,np.zeros((N,N*ncx)))),np.zeros((N*ncx,N+N*ncx))))
+
+# now check lagrangian double deriv
+Hfunc = jacfwd(jacrev(complete_lagrangian,argnums=0),argnums=0)
+HL_check = Hfunc(z, lams, xt, ut, w, theta, x_star, sqc, src, state_constraints, Nu, N, ncx, o)
+
+HL = H_2 + d2lamC   # todo: thought this should be a minus sign
+
+
 # define MPC cost, gradient and hessian function
 # cost = jit(log_barrier_cost, static_argnums=(11,12,13, 14, 15))  # static argnums means it will recompile if N changes
 # gradient = jit(grad(log_barrier_cost, argnums=0), static_argnums=(11, 12, 13, 14, 15))    # get compiled function to return gradients with respect to z (uc, s)
