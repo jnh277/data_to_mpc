@@ -41,8 +41,8 @@ T = 20              # number of time steps to simulate and record measurements f
 Nu = 1
 Nx = 1
 Ny = 1
-r_true = 1       # measurement noise standard deviation
-q_true = 1       # process noise standard deviation
+r_true = 0.1       # measurement noise standard deviation
+q_true = 0.1       # process noise standard deviation
 
 #----------------- Simulate the system-------------------------------------------#
 def ssm(x, u, a=0.5, b=0.1):
@@ -54,7 +54,7 @@ w = np.random.normal(0.0, q_true, T+1)        # make a point of predrawing noise
 y = np.zeros((T,))
 
 # create some inputs that are random but held for 10 time steps
-u = np.random.uniform(-0.5,0.5, T)
+u = np.random.uniform(-10,10, T)
 
 ### hmc parameters and set up the hmc model
 model_name = 'single_state_gaussian_priors'
@@ -67,8 +67,8 @@ else:
         pickle.dump(model, file)
 
 for t in range(T):
-    x[t+1] = ssm(x[t], u[t]) #+ q_true * np.random.randn()
-    y[t] = 2*x[t]
+    x[t+1] = ssm(x[t], u[t]) + q_true * np.random.randn()
+    y[t] = 2*x[t] + r_true * np.random.randn()
 
 # estimate system (estimates up to x_t)
 stan_data = {
@@ -86,11 +86,14 @@ z = traces['z']
 a = traces['a']
 b = traces['b']
 c = traces['c']
-# q = traces['q']
+rat1 = c/b
+rat2 = b/c
+# r = traces['r']
 
-plot_trace(a,3,1,'a')
+plot_trace(a,5,1,'a')
 plt.title('HMC inferred parameters')
-plot_trace(b,3,2,'b')
-plot_trace(c,3,3,'c')
-# plot_trace(q,4,4,'q')
+plot_trace(b,5,2,'b')
+plot_trace(c,5,3,'c')
+plot_trace(rat1,5,4,'c/b')
+plot_trace(rat2,5,5,'b/c')
 plt.show()
