@@ -53,7 +53,7 @@ y = np.zeros((T,))
 u = np.random.uniform(-10,10, T)
 
 ### hmc parameters and set up the hmc model
-model_name = 'single_state_gaussian_priors'
+model_name = 'single_state_fixed_noise'
 path = 'stan/'
 if Path(path+model_name+'.pkl').is_file():
     model = pickle.load(open(path+model_name+'.pkl', 'rb'))
