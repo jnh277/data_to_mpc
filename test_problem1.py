@@ -79,7 +79,7 @@ Hfunc = jit(jacfwd(jacrev(lagrangian, argnums=0)))
 Ffunc = jit(cost)
 dFfunc = jit(grad(cost, argnums=0))
 dCfunc = jit(jacfwd(constraint, argnums=0))
-ddCfunc = jit(jacfwd(jacrev(constraint, argnums=0)))
+# ddCfunc = jit(jacfwd(jacrev(constraint, argnums=0)))
 
 u0 = 5*np.ones((2,1))
 epsilon0 = 1.0*np.ones((1,1))
@@ -120,8 +120,6 @@ for i in range(30):
         d[ind] = 1e-5 + np.abs(d[ind])
         H = v @ np.diag(d) @ v.T
         # print('here')
-
-
 
     if qpsolver == 'OSQP': ## solve using OSQP
 

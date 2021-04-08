@@ -308,7 +308,7 @@ d2lamC = np.vstack((np.hstack((d2lamC_11,np.zeros((N,N*ncx)))),np.zeros((N*ncx,N
 Hfunc = jacfwd(jacrev(complete_lagrangian,argnums=0),argnums=0)
 HL_check = Hfunc(z, lams, xt, ut, w, theta, x_star, sqc, src, state_constraints, Nu, N, ncx, o)
 
-HL = H_2 + d2lamC   # todo: thought this should be a minus sign
+HL = H_2 - d2lamC
 
 
 # define MPC cost, gradient and hessian function
