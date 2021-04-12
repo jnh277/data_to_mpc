@@ -171,7 +171,7 @@ def pend_simulate(xt, u, w,
 
 def scan_func(carry,ii):
     carry['x'] = index_update(carry['x'], index[:, :, ii + 1], rk4(carry['x'][:, :, ii], carry['u'][:, ii], carry['theta']) + carry['w'][:, :, ii])
-    return carry, []
+    return carry, []        # todo: second output here could possibly be 'None' to improve efficiency?
 
 sim = jit(pend_simulate)
 
