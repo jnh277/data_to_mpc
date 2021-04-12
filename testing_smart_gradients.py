@@ -1,4 +1,9 @@
 # general imports
+import platform
+if platform.system()=='Darwin':
+    import multiprocessing
+    multiprocessing.set_start_method("fork")
+
 import pystan
 import numpy as np
 from helpers import col_vec, suppress_stdout_stderr
@@ -159,18 +164,28 @@ Hu = H[:N*Nu,:N*Nu]
 
 """ how we are going to replicate them by breaking them up """
 # create a wrapper around simulate that adds in u_t and takes flat uc
-def simulate_wrapper(uc_bar, xt, ut, w, theta, Nu, N):
+def simulate_wrapper(uc_bar, xt, ut, w, theta, simulate_func, Nu, N):
+    print('compiling')
     uc = jnp.reshape(uc_bar, (Nu, N))  # control input variables  #,
     u = jnp.hstack([ut, uc])  # u_t was already performed, so uc is the next N control actions
-    x = simulate(xt, u, w, theta)
+    x = simulate_func(xt, u, w, theta)
     xbar = x.flatten()
     return xbar
 
 dxdu_func = jacfwd(simulate_wrapper, argnums=0)
+
+
+# todo: this is a demo of how to jit the functions
+jitted_dxdu_func = jit(jacfwd(simulate_wrapper, argnums=0),static_argnums=(5, 6, 7))
+
+
 # dxdu_func = jit(jacfwd(simulate_wrapper, argnums=0),static_argnums=(5,6))
 
-xbar = simulate_wrapper(uc.flatten(), xt, ut, w, theta, Nu, N)      # The simulated x trajectory
-dxdu = dxdu_func(uc.flatten(), xt, ut, w, theta, Nu, N)             # gradient trajectory wrt uc
+xbar = simulate_wrapper(uc.flatten(), xt, ut, w, theta, simulate, Nu, N)      # The simulated x trajectory
+dxdu = dxdu_func(uc.flatten(), xt, ut, w, theta, simulate, Nu, N)             # gradient trajectory wrt uc
+
+# todo: this is an example of calling the jitted function
+dxdu2 = jitted_dxdu_func(uc.flatten(), xt, ut, w, theta, simulate, Nu, N)
 
 def cost(xbar, uc_bar, x_star, sqc, src, o,M,N,Nu):
     x = jnp.reshape(xbar,(o,M,N+1))
@@ -202,7 +217,7 @@ dVdz_2 = np.hstack([dVdu, grad_cost_epsilon(epsilon)])
 
 # hessian
 d2xdu2_func = jacfwd(jacrev(simulate_wrapper, argnums=0))
-d2xdu2 = d2xdu2_func(uc.flatten(), xt, ut, w, theta, Nu, N)
+d2xdu2 = d2xdu2_func(uc.flatten(), xt, ut, w, theta, simulate, Nu, N)
 d2Vdxu2_func = jacfwd(jacrev(cost, argnums=(0,1)),argnums=(0,1))
 d2Vdxu2 = d2Vdxu2_func(xbar, uc.flatten(), x_star, sqc, src, o,M,N,Nu)
 
@@ -236,6 +251,9 @@ def complete_constraint_calc(z, xt, ut, w, theta, gamma, state_constraints, Nu, 
 
     hx = jnp.concatenate([state_constraint(x[:, :, 1:]) for state_constraint in state_constraints], axis=2)
     cx = chance_constraint(hx, epsilon, gamma).flatten()
+
+    
+
     return cx
 
 dCfunc = jacfwd(complete_constraint_calc,argnums=0)
