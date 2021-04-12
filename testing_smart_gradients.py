@@ -33,7 +33,7 @@ delta = 0.05                        # desired maximum probability of not satisfy
 x_ub = 1.2
 u_ub = 2.
 state_constraints = (lambda x: x_ub - x,)
-input_constraints = (lambda u: u_ub - u,)
+input_constraints = (lambda u: u_ub - u**2,)
 
 
 # simulation parameters
@@ -134,6 +134,7 @@ theta = {'a': a,
 Nu = 1
 uc = np.ones((Nu, N))
 ncx = 1
+ncu= 1
 o = 1
 epsilon = np.ones((N * ncx,))
 z = np.hstack([uc.flatten(), epsilon])
@@ -165,7 +166,6 @@ Hu = H[:N*Nu,:N*Nu]
 """ how we are going to replicate them by breaking them up """
 # create a wrapper around simulate that adds in u_t and takes flat uc
 def simulate_wrapper(uc_bar, xt, ut, w, theta, simulate_func, Nu, N):
-    print('compiling')
     uc = jnp.reshape(uc_bar, (Nu, N))  # control input variables  #,
     u = jnp.hstack([ut, uc])  # u_t was already performed, so uc is the next N control actions
     x = simulate_func(xt, u, w, theta)
@@ -242,24 +242,26 @@ def chance_constraint(hu, epsilon, gamma):    # Pr(h(u) >= 0 ) >= (1-epsilon)
     return jnp.mean(expit(hu / gamma), axis=1) - (1 - epsilon)     # take the sum over the samples (M)
 #
 # simulate and calculate state constraint with respect to u and epsilon
-def complete_constraint_calc(z, xt, ut, w, theta, gamma, state_constraints, Nu, N, ncx):
+def complete_constraint_calc(z, xt, ut, w, theta, gamma, state_constraints, input_constraints, Nu, N, ncx):
     uc = jnp.reshape(z[:Nu * N], (Nu, N))  # control input variables  #,
     epsilon = z[Nu * N:N * Nu + ncx * N]  # slack variables on state constraints
 
     u = jnp.hstack([ut, uc])  # u_t was already performed, so uc is the next N control actions
     x = simulate(xt, u, w, theta)
 
+    # probabilistic state constraints
     hx = jnp.concatenate([state_constraint(x[:, :, 1:]) for state_constraint in state_constraints], axis=2)
     cx = chance_constraint(hx, epsilon, gamma).flatten()
 
-    
+    # straight forward state constraints
+    cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints], axis=1).flatten()
 
-    return cx
+    return jnp.hstack([cx, cu])
 
 dCfunc = jacfwd(complete_constraint_calc,argnums=0)
 
-C_check = complete_constraint_calc(z, xt, ut, w, theta, gamma, state_constraints, Nu, N, ncx)
-dC_check = dCfunc(z, xt, ut, w, theta, gamma, state_constraints, Nu, N, ncx)
+C_check = complete_constraint_calc(z, xt, ut, w, theta, gamma, state_constraints, input_constraints, Nu, N, ncx)
+dC_check = dCfunc(z, xt, ut, w, theta, gamma, state_constraints, input_constraints, Nu, N, ncx)
 
 def state_constraint_wrapper(xbar, epsilon, gamma, state_constraints, o, M, N):
     x = jnp.reshape(xbar, (o, M, N + 1))
@@ -267,16 +269,28 @@ def state_constraint_wrapper(xbar, epsilon, gamma, state_constraints, o, M, N):
     cx = chance_constraint(hx, epsilon, gamma).flatten()
     return cx
 
+def input_constraint_wrapper(ubar, input_constraints, N, Nu):
+    uc = jnp.reshape(ubar, (Nu, N))  # control input variables  #
+    cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints], axis=1).flatten()
+    return cu
+
 dCdxepsfunc = jacfwd(state_constraint_wrapper, argnums=(0,1))
 
-dCdxeps = dCdxepsfunc(xbar, epsilon, gamma, state_constraints, o, M, N)
+dCxdxeps = dCdxepsfunc(xbar, epsilon, gamma, state_constraints, o, M, N)
 
-dC = np.concatenate([dCdxeps[0] @ dxdu, dCdxeps[1]],axis=1)
+
+dCudufunc = jacfwd(input_constraint_wrapper, argnums=0)
+
+dCudu = dCudufunc(uc.flatten(), input_constraints, N, Nu)
+
+dCx = np.concatenate([dCxdxeps[0] @ dxdu, dCxdxeps[1]],axis=1)
+dCu = np.hstack([dCudu, np.zeros((ncu*N, N*Nu))])
+dC = np.vstack([dCx, dCu])
 
 np.max(np.abs(dC - dC_check))
 
 # Lagrangian and its second derivative
-def complete_lagrangian(z, lams, xt, ut, w, theta, x_star, sqc, src, state_constraints, Nu, N, ncx, o):
+def complete_lagrangian(z, lams, xt, ut, w, theta, x_star, sqc, src, state_constraints, input_constraints, Nu, N, ncx, o):
     uc = jnp.reshape(z[:Nu * N], (Nu, N))  # control input variables  #,
     epsilon = z[Nu * N:N * Nu + ncx * N]  # slack variables on state constraints
 
@@ -288,16 +302,20 @@ def complete_lagrangian(z, lams, xt, ut, w, theta, x_star, sqc, src, state_const
     hx = jnp.concatenate([state_constraint(x[:, :, 1:]) for state_constraint in state_constraints], axis=2)
     cx = chance_constraint(hx, epsilon, gamma).flatten()
 
-    L = V - np.sum(lams * cx)
+    cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints], axis=1).flatten()
+
+    c = jnp.hstack([cx, cu])
+
+    L = V - np.sum(lams * c)
     return L
 
-lams = np.ones((5,))
+lams = np.ones((10,))
 
 
 
-L = complete_lagrangian(z, lams, xt, ut, w, theta, x_star, sqc, src, state_constraints, Nu, N, ncx, o)
+L = complete_lagrangian(z, lams, xt, ut, w, theta, x_star, sqc, src, state_constraints, input_constraints, Nu, N, ncx, o)
 
-def lams_constraints(z, lams, xt, ut, w, theta, state_constraints, Nu, N, ncx):
+def lams_constraints(z, lams, xt, ut, w, theta, state_constraints, input_constraints, Nu, N, ncx):
     uc = jnp.reshape(z[:Nu * N], (Nu, N))  # control input variables  #,
     epsilon = z[Nu * N:N * Nu + ncx * N]  # slack variables on state constraints
 
@@ -306,25 +324,34 @@ def lams_constraints(z, lams, xt, ut, w, theta, state_constraints, Nu, N, ncx):
 
     hx = jnp.concatenate([state_constraint(x[:, :, 1:]) for state_constraint in state_constraints], axis=2)
     cx = chance_constraint(hx, epsilon, gamma).flatten()
-    return np.sum(lams * cx)
+
+    cu = jnp.concatenate([input_constraint(uc) for input_constraint in input_constraints], axis=1).flatten()
+
+    c = jnp.hstack([cx, cu])
+
+    return jnp.sum(lams * c)
 
 
-ddlamCfunc = jacfwd(jacrev(lams_constraints,argnums=0))
+ddlamCfunc = jacfwd(jacrev(lams_constraints,argnums=0), argnums=0)
 
-d2lamC_check = ddlamCfunc(z, lams, xt, ut, w, theta, state_constraints, Nu, N, ncx)
+d2lamC_check = ddlamCfunc(z, lams, xt, ut, w, theta, state_constraints, input_constraints, Nu, N, ncx)
 
-d2Cdx2func = jacfwd(jacrev(state_constraint_wrapper,argnums=0),argnums=0)
+d2Cxdx2func = jacfwd(jacrev(state_constraint_wrapper,argnums=0),argnums=0)
 
-d2Cdx2 = d2Cdx2func(xbar, epsilon, gamma, state_constraints, o, M, N)
+d2Cudufunc = jacfwd(jacrev(input_constraint_wrapper, argnums=0), argnums=0)
 
-test = dxdu.T @ np.sum(np.reshape(lams,(-1,1,1))*d2Cdx2,axis=0) @ dxdu
-test2 = (lams @ dCdxeps[0]) @ d2xdu2.transpose((2,0,1))
-d2lamC_11 = dxdu.T @ np.sum(np.reshape(lams,(-1,1,1))*d2Cdx2,axis=0) @ dxdu + (lams @ dCdxeps[0]) @ d2xdu2.transpose((2,0,1))
+d2Cxdx2 = d2Cxdx2func(xbar, epsilon, gamma, state_constraints, o, M, N)
+d2Cudu2 = d2Cudufunc(uc.flatten(), input_constraints, N, Nu)
+
+test = dxdu.T @ np.sum(np.reshape(lams[:ncx*N],(-1,1,1))*d2Cxdx2,axis=0) @ dxdu
+test2 = (lams[:ncx*N] @ dCxdxeps[0]) @ d2xdu2.transpose((2,0,1))
+test3 = (lams[ncx*N:] @ d2Cudu2)
+d2lamC_11 = dxdu.T @ np.sum(np.reshape(lams[:ncx*N],(-1,1,1))*d2Cxdx2,axis=0) @ dxdu + (lams[:ncx*N] @ dCxdxeps[0]) @ d2xdu2.transpose((2,0,1)) + lams[ncx*N:] @ d2Cudu2
 d2lamC = np.vstack((np.hstack((d2lamC_11,np.zeros((N,N*ncx)))),np.zeros((N*ncx,N+N*ncx))))
 
 # now check lagrangian double deriv
 Hfunc = jacfwd(jacrev(complete_lagrangian,argnums=0),argnums=0)
-HL_check = Hfunc(z, lams, xt, ut, w, theta, x_star, sqc, src, state_constraints, Nu, N, ncx, o)
+HL_check = Hfunc(z, lams, xt, ut, w, theta, x_star, sqc, src, state_constraints, input_constraints, Nu, N, ncx, o)
 
 HL = H_2 - d2lamC
 
