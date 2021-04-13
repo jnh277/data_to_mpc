@@ -213,7 +213,7 @@ dVdxu = dVdxu_func(xbar, uc.flatten(), x_star, sqc, src, o,M,N,Nu)
 dVdu_2 = dVdxu[0] @ dxdu + dVdxu[1]
 
 # d cost with respect to u and eps
-dVdz_2 = np.hstack([dVdu, grad_cost_epsilon(epsilon)])
+dVdz_2 = np.hstack([dVdu_2, grad_cost_epsilon(epsilon)])
 
 # hessian
 d2xdu2_func = jacfwd(jacrev(simulate_wrapper, argnums=0))
