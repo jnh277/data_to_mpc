@@ -160,7 +160,7 @@ for i in range(30):
     inv_mu = np.max(np.abs(eta)) + 10
 
     c = merit_function(z, w, inv_mu, gamma)
-    cind = constraint(z, w, gamma)
+    # cind = constraint(z, w, gamma)
     alpha = 1.0
     for k in range(52):
         ztest = z + alpha * p
