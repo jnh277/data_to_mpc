@@ -214,246 +214,167 @@ def merit_function(z, inv_mu, theta, sqc, src, x_star, o, Nu, N, ncx):
 lb_times = []
 sqp_times = []
 
-# xt_est_save = np.zeros((1,M,T))
-# a_est_save = np.zeros((M,T))
-# b_est_save = np.zeros((M,T))
-# q_est_save = np.zeros((M,T))
-# r_est_save = np.zeros((M,T))
-mpc_result_save = []
 
-### SIMULATE SYSTEM AND PERFORM MPC CONTROL
-for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control'):
-    # simulate system
-    # apply u_t
-    # this takes x_t to x_{t+1}
-    # measure y_t
-    x[t+1] = ssm(x[t], u[t]) + q_true * np.random.randn()
-    y[t] = x[t] + r_true * np.random.randn()
+## LOADING AND SOLVING PROBLEM FROM HERE
 
-    # estimate system (estimates up to x_t)
-    stan_data = {
-        'N': t+1,
-        'y': y[:t+1],
-        'u': u[:t+1],
-        'prior_mu': np.array([0.8, 0.05, 0.1, 0.1]),
-        'prior_std': np.array([0.2, 0.2, 0.2, 0.2]),
-        'prior_state_mu': 0.3,
-        'prior_state_std': 0.2,
-    }
-    with suppress_stdout_stderr():
-        fit = model.sampling(data=stan_data, warmup=warmup, iter=iter, chains=chains)
-    traces = fit.extract()
+with open('results/sqp_debug/saved_optims.pkl','rb') as file:
+    saved_problems = pickle.load(file)
 
-    # state samples
-    xhat = traces['z']
+ind = 3
+problem = saved_problems[ind]
 
-    # parameter samples
-    a = traces['a']
-    b = traces['b']
-    r = traces['r']
-    q = traces['q']
-
-    # current state samples (expanded to [o,M]
-    xt = np.expand_dims(xhat[:, -1], 0)  # inferred state for current time step
-    # we also need to sample noise
-    w = np.expand_dims(col_vec(q) * np.random.randn(M, N + 1), 0)  # uses the sampled stds, need to sample for x_t to x_{t+N+1}
-    ut = np.expand_dims(np.array([u[t]]), 0)  # control action that was just applied
-    theta = {'a': a,
-             'b': b, }
-
-    # package the problem data for later saving
-    problem_data = {'xt':xt,
-                    'w':w,
-                    'ut':ut,
-                    'theta':theta}
+theta = problem['problem_data']['theta']
+xt = problem['problem_data']['xt']
+w = problem['problem_data']['w']
+ut = problem['problem_data']['ut']
 
 
-    # SOLVE USING LOG BARRIER
-    # calculate next control action
-    # t1s = time.time()
-    # result = solve_chance_logbarrier(np.zeros((1, N)), cost_lb, gradient_lb, hessian_lb, ut, xt, theta, w, x_star, sqc, src,
-    #                                      delta, simulate, state_constraints, input_constraints, verbose=False)
-    # t1f = time.time()
-    # lb_times.append(t1f-t1s)
-    #
-    # uc = result['uc']
-    # u[t+1] = uc[0,0]
-
-    # SOLVE USING SQP
-    # todo: should also be pushing stuff onto jax properly here
-    uc0 = np.zeros((1, N))
-    o,N = w.shape[0],w.shape[2]-1
-    Nu = uc0.shape[0]             # input dimension
-    ncu = len(input_constraints)  # number of input constraints
-    ncx = len(state_constraints)  # number of state constraints
-    epsilon0 = 1.0
-    lams = 1e6 * np.ones((ncx * N + ncu * N + ncx*N,))      # second ncx*N is for constraints placed on epsilon
+# SOLVE USING SQP
+# todo: should also be pushing stuff onto jax properly here
+uc0 = np.zeros((1, N))
+o,N = w.shape[0],w.shape[2]-1
+Nu = uc0.shape[0]             # input dimension
+ncu = len(input_constraints)  # number of input constraints
+ncx = len(state_constraints)  # number of state constraints
+epsilon0 = 1.0
+lams = 1e6 * np.ones((ncx * N + ncu * N + ncx*N,))      # second ncx*N is for constraints placed on epsilon
 
 
-    if t==0 or i > 25:
-    # if True:    # don't hotstart atm
-        gamma = 1
-        z = np.hstack([uc0.flatten(), epsilon0 * np.ones((ncx * N,))])
-    else:       # unused hotstarting stuff
-        uc = np.hstack([uc[:,1:],uc[:,[-1]]])
-        gamma = gamma * 10
-        xbar = sim_wrap(uc.flatten(), xt, ut, w, theta, simulate, Nu, N)  # The simulated x trajectory
-        Cx = Cx_func(xbar, z[Nu*N:], gamma, state_constraints, o, M, N)
-
-        epsilon = z[Nu*N:] - np.minimum(Cx,0)
-        z = np.hstack([uc.flatten(), epsilon])
+gamma = 1
+z = np.hstack([uc0.flatten(), epsilon0 * np.ones((ncx * N,))])
 
 
-    count = 0
-    old_nd = 1e6
-    c1 = 0.01
-    subproblem_save = []
-    t2s = time.time()
-    for i in range(30):
-        # solve sqp subproblem
-        H, dV, C, dC, xbar = build_SQP_parts(z, lams, gamma, sqc, src, o, Nu, N, ncx, ncu)
+count = 0
+old_nd = 1e6
+c1 = 0.01
+subproblem_save = []
+t2s = time.time()
+for i in range(30):
+    # solve sqp subproblem
+    H, dV, C, dC, xbar = build_SQP_parts(z, lams, gamma, sqc, src, o, Nu, N, ncx, ncu)
 
 
-        subproblem = {'H':H,
-                      'dV':dV,
-                      'C':C,
-                      'dC':dC,
-                      'xbar':xbar,
-                      'gamma':gamma}
+    subproblem = {'H':H,
+                  'dV':dV,
+                  'C':C,
+                  'dC':dC,
+                  'xbar':xbar,
+                  'gamma':gamma}
+
+    if len(state_constraints) > 0:
+        x_mpc = jnp.reshape(xbar, (o, M, N + 1))
+        hx = np.concatenate([state_constraint(x_mpc[:, :, 1:]) for state_constraint in state_constraints], axis=2)
+        cx = 1 - np.mean(hx > 0, axis=1)
+    else:
+        cx = 0
+
+    [d, v] = np.linalg.eig(H)
+    min_d = np.min(d)
+    if (d < 1e-5).any():
+        Hold = 1.0 * H
+        if np.iscomplex(d).any():  # stop complex eigenvalues
+            d = np.real(d)
+            v = np.real(v)
+        ind = d < 1e-5
+        d[ind] = 1e-5 + np.abs(d[ind])
+        H = v @ np.diag(d) @ v.T
+
+    meq = 0
+    result = quadprog.solve_qp(H, -dV, dC.T, -C, meq)
+    p = result[0]
+    eta = result[4]
+
+    gradL = dV - eta @ dC
+    nd = p.dot(gradL)
+
+    V = cost(xbar, z[:Nu*N], x_star, sqc, src, o, M, N, Nu)
+
+    subproblem['p'] = p
+    subproblem['eta'] = eta
+    subproblem['gradL'] = gradL
+    subproblem['cost'] = V
+    subproblem['nd'] = nd
+    subproblem['C'] = C
+    subproblem['cx'] = cx
+
+    str = 'SQP iter: {0:3d} | gamma = {1:1.4f} | Cost = {2:2.3e} | ' \
+          'norm(grad L) = {3:2.3e} | grad = {4:2.3e} | ' \
+          'min(C) = {5:2.3e} | ' \
+          'max % cx < 0 = {6:1.3f} | ' \
+        'min eig H {7:2.3e}'.format(i, gamma, V, np.round(gradL.dot(gradL), 2), np.abs(nd), np.min(C[ncx*N:]), np.max(cx), min_d)
+    print(str)
+
+    if (np.abs(nd) < 1e-2) and np.min(C[ncx*N:]) > -1e-6 and (cx < 0.0501).all and gamma < 1e-3:    # todo: remove hardcoding of delta
+        break
+
+    inv_mu = np.max(np.abs(eta)) + 10
+
+    c = merit_function(z, inv_mu, theta, sqc, src, x_star, o, Nu, N, ncx)
+    # cind = constraint(z, w, gamma)
+    alpha = 1.0
+    for k in range(52):
+        ztest = z + alpha * p
+        ctest = merit_function(ztest, inv_mu, theta, sqc, src, x_star, o, Nu, N, ncx)
+        cun = dC @ ztest + C
 
         if len(state_constraints) > 0:
-            x_mpc = jnp.reshape(xbar, (o, M, N + 1))
-            hx = np.concatenate([state_constraint(x_mpc[:, :, 1:]) for state_constraint in state_constraints], axis=2)
-            cx = 1 - np.mean(hx > 0, axis=1)
+            xbar_test = sim_wrap(ztest[:Nu * N], xt, ut, w, theta, simulate, Nu, N)  # The simulated x trajectory
+            x_mpc_test = jnp.reshape(xbar_test, (o, M, N + 1))
+            hx = np.concatenate([state_constraint(x_mpc_test[:, :, 1:]) for state_constraint in state_constraints],
+                                axis=2)
+            cxtest = 1 - np.mean(hx > 0, axis=1)
         else:
             cx = 0
 
-        [d, v] = np.linalg.eig(H)
-        min_d = np.min(d)
-        if (d < 1e-5).any():
-            Hold = 1.0 * H
-            if np.iscomplex(d).any():  # stop complex eigenvalues
-                d = np.real(d)
-                v = np.real(v)
-            ind = d < 1e-5
-            d[ind] = 1e-5 + np.abs(d[ind])
-            H = v @ np.diag(d) @ v.T
 
-        meq = 0
-        result = quadprog.solve_qp(H, -dV, dC.T, -C, meq)
-        p = result[0]
-        eta = result[4]
-
-        gradL = dV - eta @ dC
-        nd = p.dot(gradL)
-
-        V = cost(xbar, z[:Nu*N], x_star, sqc, src, o, M, N, Nu)
-
-        subproblem['p'] = p
-        subproblem['eta'] = eta
-        subproblem['gradL'] = gradL
-        subproblem['cost'] = V
-        subproblem['nd'] = nd
-        subproblem['C'] = C
-        subproblem['cx'] = cx
-
-        str = 'SQP iter: {0:3d} | gamma = {1:1.4f} | Cost = {2:2.3e} | ' \
-              'norm(grad L) = {3:2.3e} | grad = {4:2.3e} | ' \
-              'min(C) = {5:2.3e} | ' \
-              'max % cx < 0 = {6:1.3f} | ' \
-            'min eig H {7:2.3e}'.format(i, gamma, V, np.round(gradL.dot(gradL), 2), np.abs(nd), np.min(C[ncx*N:]), np.max(cx), min_d)
-        print(str)
-
-        if (np.abs(nd) < 1e-2) and np.min(C[ncx*N:]) > -1e-6 and (cx < 0.0501).all and gamma < 1e-3:    # todo: remove hardcoding of delta
+        # if ctest < c:  # #
+        if ctest < c + c1 * alpha * (nd - inv_mu * np.sum(np.minimum(cun, 0))):  # check this is correct?
+            # if ctest < c + c1 * alpha * (nd - inv_mu * np.sum(np.minimum(cun, 0))) and ((cxtest <= cx) + (cxtest < 0.0501)).all():  # check this is correct?
+            z = ztest
+            # lams = device_put(eta)
+            lams = eta
             break
 
-        inv_mu = np.max(np.abs(eta)) + 10
+        alpha = alpha / 2
 
-        c = merit_function(z, inv_mu, theta, sqc, src, x_star, o, Nu, N, ncx)
-        # cind = constraint(z, w, gamma)
-        alpha = 1.0
-        for k in range(52):
-            ztest = z + alpha * p
-            ctest = merit_function(ztest, inv_mu, theta, sqc, src, x_star, o, Nu, N, ncx)
-            cun = dC @ ztest + C
+    subproblem['alpha'] = alpha
+    subproblem_save.append(subproblem)
 
-            if len(state_constraints) > 0:
-                xbar_test = sim_wrap(ztest[:Nu * N], xt, ut, w, theta, simulate, Nu, N)  # The simulated x trajectory
-                x_mpc_test = jnp.reshape(xbar_test, (o, M, N + 1))
-                hx = np.concatenate([state_constraint(x_mpc_test[:, :, 1:]) for state_constraint in state_constraints],
-                                    axis=2)
-                cxtest = 1 - np.mean(hx > 0, axis=1)
-            else:
-                cx = 0
+    # always decrease by 2
+    gamma = max(gamma / 2, 0.99e-3)
 
+    # below is for decreasing only when newton decrement is small
+    # if (np.abs(nd) < 1e0):
+    #     if count > 0:
+    #         gamma = max(gamma / 5, 0.99e-3)
+    #     else:
+    #         gamma = max(gamma / 2, 0.99e-3)
+    #     count += 1
+    # else:
+    #     count=0
 
-            # if ctest < c:  # #
-            if ctest < c + c1 * alpha * (nd - inv_mu * np.sum(np.minimum(cun, 0))) and ((cxtest <= cx) + (cxtest < 0.0501)).all():  # check this is correct?
-                z = ztest
-                # lams = device_put(eta)
-                lams = eta
-                break
-
-            alpha = alpha / 2
-
-        subproblem['alpha'] = alpha
-        subproblem_save.append(subproblem)
-
-        # always decrease by 2
-        gamma = max(gamma / 2, 0.99e-3)
-
-        # below is for decreasing only when newton decrement is small
-        # if (np.abs(nd) < 1e0):
-        #     if count > 0:
-        #         gamma = max(gamma / 5, 0.99e-3)
-        #     else:
-        #         gamma = max(gamma / 2, 0.99e-3)
-        #     count += 1
-        # else:
-        #     count=0
-
-        # below is to try to increase if things stop working so well (sometimes helps...)
-        # if np.abs(nd) > old_nd * 0.99 and nd > 1e-2:
-        #     count += 1
-        # else:
-        #     count = 0
-        # old_nd = np.abs(nd)
-        #
-        # if count >= 3:
-        #     gamma = 1.0
-        # else:
-        #     gamma = max(gamma / 1.5, 0.99e-3)
-    t2f = time.time()
-    sqp_times.append(t2f-t2s)
-
-    uc = np.reshape(z[:Nu*N], (Nu, N))  # control input variables  #,
-    u[t + 1] = uc[0, 0]
+    # below is to try to increase if things stop working so well (sometimes helps...)
+    # if np.abs(nd) > old_nd * 0.99 and nd > 1e-2:
+    #     count += 1
+    # else:
+    #     count = 0
+    # old_nd = np.abs(nd)
+    #
+    # if count >= 3:
+    #     gamma = 1.0
+    # else:
+    #     gamma = max(gamma / 1.5, 0.99e-3)
 
 
 
-    result = {'uc':uc,
-              'timestep':t,
-              'epsilon':z[Nu*N:N*Nu+ncx*N],
-              'gamma':gamma,
-              'iters':i,
-              'cost':V,
-              'grad L':gradL,
-              'nd':nd,
-              'p':p,
-              'C':C,
-              'cx':cx,
-              'xt':xt,
-              'problem_data':problem_data,
-              'subproblems':subproblem_save}
-    mpc_result_save.append(result)
 
 
-with open('results/sqp_debug/cx_constrained_saved_optims.pkl','wb') as file:
-    pickle.dump(mpc_result_save, file)
+
+
+
+
 
 ## load using
 # with open('results/sqp_debug/cx_constrained_saved_optims.pkl','rb') as file:
 #     saved_optims = pickle.load(file)
 
-plt.plot(x)
-plt.show()
