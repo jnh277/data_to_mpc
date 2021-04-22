@@ -1,6 +1,6 @@
 Cython==0.29.21
-jax==0.2.8
-jaxlib==0.1.59
+# jax==0.2.8
+# jaxlib==0.1.59 # jax should be installed as per separate instructions
 matplotlib==3.3.3
 numpy==1.19.5
 pandas==1.2.1
