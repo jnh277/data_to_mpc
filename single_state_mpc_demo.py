@@ -33,6 +33,7 @@ from tqdm import tqdm
 import jax.numpy as jnp
 from jax import grad, jit,  jacfwd, jacrev
 from jax.ops import index, index_update
+from jax.lax import scans
 from jax.config import config
 
 # optimisation module imports (needs to be done before the jax confix update)
@@ -88,14 +89,24 @@ else:
 
 ## define jax friendly function for simulating the system during mpc
 def simulate(xt, u, w, theta):
-    a = theta['a']
-    b = theta['b']
     [o, M, N] = w.shape
     x = jnp.zeros((o, M, N+1))
     x = index_update(x, index[:, :,0], xt)
-    for k in range(N):
-        x = index_update(x, index[:, :, k+1], a * x[:, :, k] + b * u[:, k] + w[:, :, k])
-    return x[:, :, 1:]
+    ks = jnp.arange(N)
+    dict = {
+        'x':x,
+        'u':u,
+        'w':w,
+        'theta':theta
+    }
+    dict,_ = scan(scan_func,dict,ks)
+    # for k in range(N):
+    #     x = index_update(x, index[:, :, k+1], a * x[:, :, k] + b * u[:, k] + w[:, :, k])
+    return dict['x'][:, :, 1:]
+
+def scan_func(carry,k):
+    carry['x'] = index_update(carry['x'], index[:, :, k+1], carry['theta']['a'] * carry['x'][:, :, k] + carry['theta']['b'] * carry['u'][:, k] + carry['w'][:, :, k])
+    return carry,[]
 
 # define MPC cost, gradient and hessian function
 cost = jit(log_barrier_cost, static_argnums=(11,12,13, 14, 15))  # static argnums means it will recompile if N changes
