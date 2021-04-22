@@ -33,7 +33,7 @@ from tqdm import tqdm
 import jax.numpy as jnp
 from jax import grad, jit,  jacfwd, jacrev
 from jax.ops import index, index_update
-from jax.lax import scans
+from jax.lax import scan
 from jax.config import config
 
 # optimisation module imports (needs to be done before the jax confix update)
@@ -100,6 +100,7 @@ def simulate(xt, u, w, theta):
         'theta':theta
     }
     dict,_ = scan(scan_func,dict,ks)
+    print('tracing...')
     # for k in range(N):
     #     x = index_update(x, index[:, :, k+1], a * x[:, :, k] + b * u[:, k] + w[:, :, k])
     return dict['x'][:, :, 1:]
@@ -169,7 +170,7 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
 
     # calculate next control action
     result = solve_chance_logbarrier(np.zeros((1, N)), cost, gradient, hessian, ut, xt, theta, w, x_star, sqc, src,
-                                     delta, simulate, state_constraints, input_constraints, verbose=False)
+                                     delta, simulate, state_constraints, input_constraints, verbose=True)
 
     mpc_result_save.append(result)
     uc = result['uc']
