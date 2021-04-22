@@ -20,7 +20,11 @@
 """ This script runs simulation A) Pedagogical Example from the paper and saves the results """
 """ This overwrites the preincluded results that match the paper plots """
 """ The results can then be plotted using the script 'plot_single_state_demo.py' """
-
+import platform
+if platform.system()=='Darwin':
+    import multiprocessing
+    multiprocessing.set_start_method("fork")
+    
 # general imports
 import pystan
 import numpy as np
