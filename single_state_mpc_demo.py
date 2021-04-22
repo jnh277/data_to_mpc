@@ -24,7 +24,7 @@ import platform
 if platform.system()=='Darwin':
     import multiprocessing
     multiprocessing.set_start_method("fork")
-    
+
 # general imports
 import pystan
 import numpy as np
@@ -104,7 +104,6 @@ def simulate(xt, u, w, theta):
         'theta':theta
     }
     dict,_ = scan(scan_func,dict,ks)
-    print('tracing...')
     # for k in range(N):
     #     x = index_update(x, index[:, :, k+1], a * x[:, :, k] + b * u[:, k] + w[:, :, k])
     return dict['x'][:, :, 1:]
@@ -174,7 +173,7 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
 
     # calculate next control action
     result = solve_chance_logbarrier(np.zeros((1, N)), cost, gradient, hessian, ut, xt, theta, w, x_star, sqc, src,
-                                     delta, simulate, state_constraints, input_constraints, verbose=True)
+                                     delta, simulate, state_constraints, input_constraints, verbose=False)
 
     mpc_result_save.append(result)
     uc = result['uc']
