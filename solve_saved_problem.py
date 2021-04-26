@@ -13,6 +13,7 @@ import pickle
 from tqdm import tqdm
 import quadprog
 import time
+import scipy
 import matplotlib.pyplot as plt
 
 # jax related imports
@@ -198,6 +199,7 @@ def build_SQP_parts(z, lams, gamma, sqc, src, o, Nu, N, ncx, ncu):
 
     return H, dV, C, dC, xbar
 
+
 def merit_function(z, inv_mu, theta, sqc, src, x_star, o, Nu, N, ncx):
     ubar = z[:Nu*N]
     epsilon = z[Nu*N:N*Nu+ncx*N]                        # slack variables on state constraints
@@ -220,7 +222,7 @@ sqp_times = []
 with open('results/sqp_debug/saved_optims.pkl','rb') as file:
     saved_problems = pickle.load(file)
 
-ind = 3
+ind = 11
 problem = saved_problems[ind]
 
 theta = problem['problem_data']['theta']
@@ -243,6 +245,7 @@ lams = 1e6 * np.ones((ncx * N + ncu * N + ncx*N,))      # second ncx*N is for co
 gamma = 1
 z = np.hstack([uc0.flatten(), epsilon0 * np.ones((ncx * N,))])
 
+# todo: question is epsilon even necessary in this approach?
 
 count = 0
 old_nd = 1e6
@@ -267,6 +270,14 @@ for i in range(30):
         cx = 1 - np.mean(hx > 0, axis=1)
     else:
         cx = 0
+
+    # ind = C < 1e-6
+    # dC_I = dC[ind, :]
+    # Q = scipy.linalg.null_space(dC_I)
+    # Hp = Q.T @ H @ Q
+    # [dp, vp] = np.linalg.eig(H)
+    # if (dp < 1e-5).any():
+    #
 
     [d, v] = np.linalg.eig(H)
     min_d = np.min(d)
@@ -343,38 +354,130 @@ for i in range(30):
     # always decrease by 2
     gamma = max(gamma / 2, 0.99e-3)
 
-    # below is for decreasing only when newton decrement is small
-    # if (np.abs(nd) < 1e0):
-    #     if count > 0:
-    #         gamma = max(gamma / 5, 0.99e-3)
-    #     else:
-    #         gamma = max(gamma / 2, 0.99e-3)
-    #     count += 1
-    # else:
-    #     count=0
-
-    # below is to try to increase if things stop working so well (sometimes helps...)
-    # if np.abs(nd) > old_nd * 0.99 and nd > 1e-2:
-    #     count += 1
-    # else:
-    #     count = 0
-    # old_nd = np.abs(nd)
-    #
-    # if count >= 3:
-    #     gamma = 1.0
-    # else:
-    #     gamma = max(gamma / 1.5, 0.99e-3)
-
-
-
-
-
-
-
-
-
-
-## load using
-# with open('results/sqp_debug/cx_constrained_saved_optims.pkl','rb') as file:
-#     saved_optims = pickle.load(file)
-
+## solve instead using primal dual interior point method
+#
+# def build_RHS_parts(z, gamma, sqc, src, o, Nu, N, ncx, ncu):
+#     # Todo: push things to jax and pull things from jax properly
+#     ubar = z[:Nu*N]
+#     epsilon = z[Nu*N:N*Nu+ncx*N]                        # slack variables on state constraints
+#     # first calculate components
+#     xbar = sim_wrap(ubar, xt, ut, w, theta, simulate, Nu, N)  # The simulated x trajectory
+#     dxdu = dxdu_func(ubar, xt, ut, w, theta, simulate, Nu, N)  # gradient trajectory wrt uc
+#     dVdxu = dVdxu_func(xbar, ubar, x_star, sqc, src, o, M, N, Nu)
+#     dCxdxeps = dCxdxepsfunc(xbar, epsilon, gamma, state_constraints, o, M, N)
+#     dCudu = dCudufunc(ubar, input_constraints, N, Nu)
+#     Cx = Cx_func(xbar, epsilon, gamma, state_constraints, o, M, N)
+#     Cu = Cu_func(ubar, input_constraints, N, Nu)
+#     C = np.hstack([Cx, Cu, epsilon - 0.05])     # todo, derivative of constraints w.r.t epsilon
+#
+#     # then combine components
+#     # put together derivative of cost with respect to z
+#     dVdu = dVdxu[0] @ dxdu + dVdxu[1]
+#     dV = np.hstack([dVdu, grad_cost_epsilon(epsilon)])
+#
+#     # put together derivative of constraints with respect to z
+#     dCx = np.concatenate([dCxdxeps[0] @ dxdu, dCxdxeps[1]], axis=1)
+#     dCu = np.hstack([dCudu, np.zeros((ncu * N, ncx * N))])
+#     dCeps = np.hstack([np.zeros((ncx*N,Nu * N)),np.eye(ncx * N)])
+#     dC = np.vstack([dCx, dCu, dCeps])
+#
+#     return dV, C, dC, xbar
+#
+#
+# uc0 = np.zeros((1, N))
+# o,N = w.shape[0],w.shape[2]-1
+# Nu = uc0.shape[0]             # input dimension
+# ncu = len(input_constraints)  # number of input constraints
+# ncx = len(state_constraints)  # number of state constraints
+# epsilon0 = 1.0
+# # lams = 1e6 * np.ones((ncx * N + ncu * N + ncx*N,))      # second ncx*N is for constraints placed on epsilon
+#
+#
+# gamma = 1
+# z = np.hstack([uc0.flatten(), epsilon0 * np.ones((ncx * N,))])
+# lams = 1e2 * np.ones((ncx * N + ncu * N + ncx*N,))      # second ncx*N is for constraints placed on epsilon
+#
+# for i in range(40):
+#     H, dV, C, dC, xbar = build_SQP_parts(z, lams, gamma, sqc, src, o, Nu, N, ncx, ncu)
+#
+#     # determine mu
+#     eta = lams.dot(C)
+#     mu = eta / len(C) / 5     # derp need to remember to decrease this
+#     # mu = 1/mu
+#
+#     # put together LHS
+#     t1 = np.hstack((H, -dC.T))
+#     t2 = np.hstack((np.expand_dims(lams,1) * dC, np.diag(C)))
+#     lhs = np.vstack((t1,t2))
+#
+#     # put together RHS
+#     rhs = np.hstack((-dV + dC.T @ lams, mu - lams * C))
+#
+#
+#     str = 'iter: {0:3d} | gamma = {1:1.4f} | ' \
+#           'sqrt(norm(r)) = {2:2.3e} | eta = {3:2.3e} |' \
+#           'min(C) = {4:2.3e} | '.format(i, gamma, np.round(np.sqrt((rhs/len(rhs)).dot(rhs/len(rhs))), 2), eta, np.min(C))
+#     print(str)
+#
+#     if np.sqrt(np.sum(((rhs[:len(z)]/len(rhs))**2))) < 1e-0 and mu < 1e-6 and gamma < 1e-3:    # todo: remove hardcoding of delta
+#         break
+#
+#     # solve for search direction
+#     # l,d,perm = scipy.linalg.ldl(lhs)  # lhs is not symmetric so cant use ldl??
+#     # tmp = np.zeros((len(rhs)))
+#     # tmp[perm] = scipy.linalg.solve_triangular(l[perm,:],rhs[perm],lower=True, unit_diagonal=True)
+#     # delta = np.zeros((len(rhs)))
+#     # delta[perm] = scipy.linalg.solve_triangular(l[perm,:],(tmp / np.diag(d))[perm], trans=1,lower=True, unit_diagonal=True)
+#
+#     delta = scipy.linalg.solve(lhs, rhs)
+#
+#     ind = delta[len(z):] < 0
+#     if ind.any():
+#         alpha = np.minimum(0.99*np.min(np.abs(lams[ind]/delta[len(z):][ind])),1)
+#     else:
+#         alpha = 1
+#
+#     for k in range(52):
+#         ztest = z + alpha * delta[:len(z)]
+#         lamstest = lams + alpha * delta[len(z):]
+#
+#         dV_test, C_test, dC_test, xbar_test = build_RHS_parts(ztest, gamma, sqc, src, o, Nu, N, ncx, ncu)
+#
+#         if len(state_constraints) > 0:
+#             xbar_test = sim_wrap(ztest[:Nu * N], xt, ut, w, theta, simulate, Nu, N)  # The simulated x trajectory
+#             x_mpc_test = jnp.reshape(xbar_test, (o, M, N + 1))
+#             hx = np.concatenate([state_constraint(x_mpc_test[:, :, 1:]) for state_constraint in state_constraints],
+#                                 axis=2)
+#             cxtest = 1 - np.mean(hx > 0, axis=1)
+#         else:
+#             cxtest = 0
+#
+#         rhstest = np.hstack((-dV_test + dC_test.T @ lamstest, mu - lamstest * C_test ))
+#
+#         # if np.sum(rhstest**2) < np.sum(rhs**2) and (C_test > 0).all() and (lamstest > 0).all():
+#         if np.sum(rhstest ** 2) < (1-alpha)*np.sum(rhs ** 2) and (C_test > 0).all() and (cxtest <= 0.0500).all(): # todo: remove hardcoding delta
+#             z = ztest
+#             lams = lamstest
+#             break
+#         else:
+#             alpha = alpha/2
+#
+#
+#
+#     gamma = max(gamma / 2, 0.99e-6)
+#     if ncx > 0:
+#         xbar = sim_wrap(z[:Nu * N], xt, ut, w, theta, simulate, Nu, N)  # The simulated x trajectory
+#         x_new = jnp.reshape(xbar, (o, M, N + 1))
+#         hx = jnp.concatenate([state_constraint(x_new[:, :, 1:]) for state_constraint in state_constraints], axis=2)
+#         cx = chance_constraint(hx, z[Nu * N:Nu * N + ncx * N], gamma)
+#         z[Nu * N:Nu * N + ncx * N] += -np.minimum(cx[0, :], 0) + 1e-6
+#
+#
+# x_mpc = jnp.reshape(xbar, (o, M, N + 1))
+# plt.plot(x_mpc.mean(axis=1).flatten())
+# plt.show()
+#
+# ## load using
+# # with open('results/sqp_debug/cx_constrained_saved_optims.pkl','rb') as file:
+# #     saved_optims = pickle.load(file)
+#

@@ -14,6 +14,7 @@ from tqdm import tqdm
 import quadprog
 import time
 import matplotlib.pyplot as plt
+import scipy
 
 # jax related imports
 from jax.scipy.special import expit
@@ -138,3 +139,33 @@ plt.title('H is PD')
 
 plt.tight_layout()
 plt.show()
+
+
+# look at 20, 6, 17 etc
+subprob = subproblems[17]
+H = subprob['H']
+[d, v] = np.linalg.eig(H)
+print('minimum eigenvalue of hessian = ', d.min())
+
+C = subprob['C']
+ind = C < 1e-6
+dC = subprob['dC']
+dC_I = dC[ind,:]
+
+Q = scipy.linalg.null_space(dC_I)
+
+Hp = Q.T @ H @ Q
+
+[dp, vp] = np.linalg.eig(Hp)
+print('minimum eigenvalue of projected hessian = ', dp.min())
+
+dp2 = 0 * d
+# for i in range(len(d)):
+i = 0
+dz = 0 * d
+dz[i] = d[i]
+t = Q.T @ v @ np.diag(dz) @ v.T @ Q
+
+
+t = Q.T @ v
+tn = scipy.linalg.null_space(t)
