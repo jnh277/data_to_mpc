@@ -32,11 +32,11 @@ functions{
     // x = [ball position from magnet, ball velocity]
         int pdims[2] = dims(z);
         matrix[pdims[1],pdims[2]] dz;
-        real k0 = theta[1];
-        real I0 = theta[2];
+        real k0 = theta[2];
+        real I0 = theta[1];
         // row_vector[pdims[2]] dz2 = 
         dz[1,:] = z[2,:];
-        dz[2,:] = g - k0 * u ./(z[1,:] + I0).*(z[1,:] + I0);
+        dz[2,:] = g - k0 * u .* u ./((z[1,:] + I0).*(z[1,:] + I0));
         return dz;
     }
 
@@ -75,7 +75,7 @@ data {
 }
 parameters {
     matrix[2,no_obs+1] h;                     // hidden states
-    vector<lower=0.0>[2] theta;             // the parameters  [k0, I0]
+    vector<lower=0.0>[2] theta;             // the parameters  [I0, k0]
 //    vector[4] z0;                           // initial state guess
     vector<lower=1e-8>[1] r;                 // independent measurement noise variances
     vector<lower=1e-8>[2] q;                 // independent process noise variances

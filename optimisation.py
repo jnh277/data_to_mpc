@@ -98,7 +98,13 @@ def log_barrier_cost(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, gamma, si
     x = simulate(xt, u, w, theta)
     # state error and input penalty cost and cost that drives slack variables down
     # potentially np.reshape(x_star,(o,1,-1))??
-    V1 = jnp.sum(jnp.matmul(sqc,jnp.reshape(x[:,:,1:] - jnp.reshape(x_star,(o,1,-1)),(o,-1))) ** 2) + jnp.sum(jnp.matmul(src, uc)**2) + jnp.sum(300 * (epsilon + 1e3)**2)
+    V1 = jnp.sum((sqc[1, 1] * (x[1, :, 1:] - x_star[1, 0]))**2) + \
+         jnp.sum((sqc[0, 0] * (x[0, :, 1:] - x_star[0, 0])) ** 2) + \
+         jnp.sum(jnp.matmul(src, uc) ** 2) + jnp.sum(2000 * (epsilon + 1e3) ** 2)
+        #  jnp.sum((sqc[2, 2] * (x[2, :, 1:] - x_star[2, 0])) ** 2) + \
+        #  jnp.sum((sqc[3, 3] * (x[3, :, 1:] - x_star[3, 0])) ** 2) + \
+
+    # V1 = jnp.sum(jnp.matmul(sqc,jnp.reshape(x[:,:,1:] - jnp.reshape(x_star,(o,1,-1)),(o,-1))) ** 2) + jnp.sum(jnp.matmul(src, uc)**2) + jnp.sum(300 * (epsilon + 1e3)**2)
     # need a log barrier on each of the slack variables to ensure they are positve
     V2 = logbarrier(epsilon - delta, mu)     # aiming for 1-delta% accuracy
     # now the chance constraints
@@ -250,10 +256,11 @@ def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_st
         if k == 51 and np.abs(nd) > 1e-2:
             status = 3
             print('Unable to find an alpha that decreases cost')
+            print(z)
             break
         if verbose==2:
             print('Iter:', i + 1, 'Cost: ', c, 'nd:', np.dot(g, p), 'alpha: ', alpha, 'mu: ', mu, 'gamma: ', gamma)
-
+            print(z)
         if np.abs(nd) < 1e-2:  # if search direction was really small, then decrease mu and s for next iteration
             if mu < 1e-6 and gamma < 1e-3:
                 status = 0
@@ -271,12 +278,14 @@ def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_st
             jgamma = device_put(gamma)
 
 
+
     uc = jnp.reshape(z[:Nu*N], (Nu, N))                 # control input variables  #,
     epsilon = z[Nu*N:N*Nu+ncx*N]                        # slack variables on state constraints
 
     if status==0:
         if verbose:
             print("Converged to minima")
+            print(uc)
         x_check = simulate(xt, np.hstack([ut, uc]), w, theta)
         if ncx > 0:
             hx = jnp.concatenate([state_constraint(x_check[:, :, 1:]) for state_constraint in state_constraints], axis=2)
