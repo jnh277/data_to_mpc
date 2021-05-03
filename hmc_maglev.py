@@ -49,12 +49,12 @@ Ns = 200             # number of samples we will use for MC MPC
 Nh = 13              # horizonline of MPC algorithm
 sqc_v = np.array([10.,10.],dtype=float) # cost on state error
 sqc = np.diag(sqc_v)
-src = np.array([[0.0000001]]) # cost on the input
+src = np.array([[10.]]) # cost on the input
 
 # define the state constraints, (these need to be tuples)
 position_upper_bound = 0.014 # m -- location of the post
 position_lower_bound = 0.0 # m, location of the electromagnet
-input_upper_bound = 24 # amps
+input_upper_bound = 1 # amps
 input_lower_bound = -0.0001
 state_constraints = (lambda z: position_lower_bound + z[[0],:,:],lambda z: -z[[0],:,:] + position_upper_bound)
 input_constraints = (lambda u: input_upper_bound-u, lambda u: u + input_lower_bound)
@@ -104,9 +104,9 @@ def maglev_gradient(xt, u, t): # uses the lumped parametersation
     dx = index_update(dx, index[0, :], xt[1, :])
     dx = index_update(dx, index[1, :], t['g'] - t['k0'] * u * u / (t['I0'] + xt[0,:]) / (t['I0'] + xt[0,:]))
     return dx
-def current_current(xt,t):
-    return np.sqrt(t['g']/t['k0'].mean())*(xt[0,:].mean() + t['I0'].mean())
 
+def current_current(xt,t):
+    return np.sqrt(t['g'].mean()/t['k0'].mean())*(xt[0,:].mean() + t['I0'].mean())
 def rk4(xt, ut, theta):
     h = theta['h']
     k1 = maglev_gradient(xt, ut, theta)
@@ -195,7 +195,6 @@ theta_p_mu = np.array([1.0*I0_true, 1.0*k0_true])
 u[0,0] = 0.
 
 ### SIMULATE SYSTEM AND PERFORM MPC CONTROL
-for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control'):
     # simulate system
     # apply u_t
     # this takes x_t to x_{t+1}
@@ -219,8 +218,8 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
                 'q_p_std': 0.0005*np.array([q1_true, q2_true]),
                 }
 
-    with suppress_stdout_stderr():
-        fit = model.sampling(data=stan_data, warmup=warmup, iter=iter, chains=chains)
+
+    fit = model.sampling(data=stan_data, warmup=warmup, iter=iter, chains=chains)
     traces = fit.extract()
     hmc_traces_save.append(traces)
 
@@ -269,7 +268,7 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
                                          delta, simulate, state_constraints, input_constraints, verbose=2,
                                          max_iter=max_iter,mu=mu,gamma=gamma)
     else:
-        cc = current_current(xt,theta_mpc)
+        cc = current_current(xt,theta_mpc):
         result = solve_chance_logbarrier(cc*np.ones((1, Nh)), cost, gradient, hessian, ut, xt, theta_mpc, w_mpc, z_star, sqc,
                                          src,
                                          delta, simulate, state_constraints, input_constraints, verbose=2,
