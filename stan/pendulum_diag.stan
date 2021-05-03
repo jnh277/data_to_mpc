@@ -34,14 +34,13 @@ functions{
         matrix[pdims[1],pdims[2]] dz;
         real k0 = theta[1];
         real I0 = theta[2];
-        row_vector[pdims[2]] dz2 = g - k0 * u/((I0 + z[1,:])^2)
-
+        // row_vector[pdims[2]] dz2 = 
         dz[1,:] = z[2,:];
-        dz[2,:] = dz2;
+        dz[2,:] = g - k0 * u ./(z[1,:] + I0).*(z[1,:] + I0);
         return dz;
     }
 
-    matrix rk4_update(matrix z, row_vector u, vector theta, real g){
+    matrix rk4_update(matrix z, row_vector u, vector theta, real g, real Ts){
         int pdims[2] = dims(z);
         matrix[pdims[1],pdims[2]] k1;
         matrix[pdims[1],pdims[2]] k2;
@@ -59,7 +58,7 @@ functions{
 
 data {
     int<lower=0> no_obs;
-    matrix[3, no_obs] y;                // measurement [x, y, theta]
+    row_vector[no_obs] y;                // measurement [x, y, theta]
     row_vector[no_obs] u;               // input
     real<lower=0> Ts;                   // time step
     real g;                             // gravity
@@ -86,7 +85,7 @@ transformed parameters {
     matrix[2, no_obs] mu;
     matrix[1, no_obs] yhat;
     // process model
-    mu = rk4_update(h[:,1:no_obs], u[1:no_obs], theta, g); // this option was used for results in paper
+    mu = rk4_update(h[:,1:no_obs], u[1:no_obs], theta, g, Ts); // this option was used for results in paper
     // measurement model
     yhat[1,:] = h[1,1:no_obs];
 }
@@ -105,7 +104,7 @@ model {
     h[2,2:no_obs+1] ~ normal(mu[2,:], q[2]);
 
     // independent measurement likelihoods
-    y[1,:] ~ normal(yhat[1,:], r[1]);
+    y[:] ~ normal(yhat[1,:], r[1]);
 
 }
 //generated quantities {
