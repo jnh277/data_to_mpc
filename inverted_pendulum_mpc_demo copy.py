@@ -71,9 +71,9 @@ q1_true = 3e-4       # process noise standard deviation
 q2_true = 1e-4      # process noise standard deviation
 
 # got these values from the data sheet
-Mb_true = 0.06 # kg
-Ldiff_true = 0.04 # H
-x50_true = 0.04
+Mb_true = 0.06 # kg, mass of the steel ball
+Ldiff_true = 0.04 # H, difference between coil L at zero and infinity (L(0) - L(inf))
+x50_true = 0.002 # m, location in mode of L where L is 50% of the infinity and 0 L's
 grav = 9.81
 
 theta_true = {
@@ -163,9 +163,9 @@ else:
         pickle.dump(model, file)
 
 # load hmc warmup
-inv_metric = pickle.load(open('stan_traces/inv_metric.pkl','rb'))
-stepsize = pickle.load(open('stan_traces/step_size.pkl','rb'))
-last_pos = pickle.load(open('stan_traces/last_pos.pkl','rb'))
+# inv_metric = pickle.load(open('stan_traces/inv_metric.pkl','rb'))
+# stepsize = pickle.load(open('stan_traces/step_size.pkl','rb'))
+# last_pos = pickle.load(open('stan_traces/last_pos.pkl','rb'))
 
 
 # define MPC cost, gradient and hessian function
