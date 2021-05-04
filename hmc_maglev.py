@@ -116,13 +116,10 @@ z_sim[:,:,1:] = simulate(z_sim[:,:,0],u,w_sim,theta_true)
 # draw measurement noise
 v = np.zeros((Ny,T), dtype=float)
 v[0,:] = np.random.normal(0.0, r1_true, T)
-# v[1,:] = np.random.normal(0.0, r2_true, T)
 
 # simulated measurements 
 y = np.zeros((Ny,T), dtype=float)
 y[0,:] = z_sim[0,0,:-1]
-# y[1,:t_switch] = (-k_true*z_sim[0,:t_switch] -b_true*z_sim[1,:t_switch] + u[0,:t_switch] + u[1,:t_switch])/m_true
-# y[1,t_switch:] = (-k_true*z_sim[0,t_switch:-1] -b_true*z_sim[1,t_switch:-1] + s1*u[0,t_switch:] + s2*u[1,t_switch:])/(m_true) # s1, s2 modified inputs
 y = y + v; # add noise to measurements
 
 plt.subplot(2,1,1)
@@ -138,7 +135,7 @@ plt.show()
 # #----------- USE HMC TO PERFORM INFERENCE ---------------------------#
 # # avoid recompiling
 # script_path = os.path.dirname(os.path.realpath(__file__))
-# model_name = 'MSD_actuator_failure_position_only'
+# model_name = 'maglev'
 # path = '/stan/'
 # if Path(script_path+path+model_name+'.pkl').is_file():
 #     model = pickle.load(open(script_path+path+model_name+'.pkl', 'rb'))
@@ -151,9 +148,14 @@ plt.show()
 #     'N':T,
 #     'y':y,
 #     'u':u,
-#     'O':Nx,
-#     'D':Ny,
-#     'T':tau
+#     'g':grav,
+    # 'theta_p_mu':theta_p_mu,
+    # 'theta_p_std':0.0005*np.array([I0_true, k0_true]),
+    # 'r_p_mu': np.array([r1_true]),
+    # 'r_p_std': 0.0005*np.array([r1_true]),
+    # 'q_p_mu': np.array([q1_true, q2_true]),
+    # 'q_p_std': 0.0005*np.array([q1_true, q2_true]),
+#     'Ts':Ts
 # }
 
 # fit = model.sampling(data=stan_data, warmup=1000, iter=2000)
@@ -161,36 +163,25 @@ plt.show()
 
 # # state samples
 # z_samps = np.transpose(traces['z'],(1,0,2)) # Ns, Nx, T --> Nx, Ns, T
-
+# theta_samps = traces['theta']
 
 # # parameter samples
-# m_samps = traces['m'].squeeze()
-# k_samps = traces['k'].squeeze()
-# b_samps = traces['b'].squeeze() # single valued parameters shall 1D numpy objects! The squeeze has been squoze
-# q_samps = np.transpose(traces['q'],(1,0)) 
-# r_samps = np.transpose(traces['r'],(1,0))
-# t_samps = traces['t'].squeeze()
-# s1_samps = traces['s1'].squeeze()
-# s2_samps = traces['s2'].squeeze()
+# I0_samps = theta_samps[:, 0].squeeze()
+# k0_samps = theta_samps[:, 1].squeeze()
+# r_samps = traces['r']
+# q_samps = traces['q']
 
 # # plot the initial parameter marginal estimates
 # q1plt = q_samps[0,:].squeeze()
 # q2plt = q_samps[1,:].squeeze()
 # r1plt = r_samps[0,:].squeeze()
-# # r2plt = r_samps[1,:].squeeze()
 
-
-# plot_trace(m_samps,2,5,1,'m')
+# plot_trace_grid(I0_samps,1,5,1,'I0')
 # plt.title('HMC inferred parameters')
-# plot_trace(k_samps,2,5,2,'k')
-# plot_trace(b_samps,2,5,3,'b')
-# plot_trace(q1plt,2,5,4,'q1')
-# plot_trace(q2plt,2,5,5,'q2')
-# plot_trace(r1plt,2,5,6,'r1')
-# # plot_trace(r2plt,2,5,7,'r2')
-# plot_trace(t_samps,2,5,8,'t')
-# plot_trace(s1_samps,2,5,9,'s1')
-# plot_trace(s2_samps,2,5,10,'s2')
+# plot_trace_grid(k0_samps,1,5,2,'k0')
+# plot_trace_grid(q1plt,1,5,3,'q1')
+# plot_trace_grid(q1plt,1,5,4,'q2')
+# plot_trace_grid(r1plt,1,5,5,'r1')
 # plt.show()
 
 # # plot some of the initial marginal state estimates
