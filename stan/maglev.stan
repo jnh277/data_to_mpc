@@ -10,7 +10,7 @@ functions{
         real I0 = theta[1];
         // row_vector[pdims[2]] dz2 = 
         dz[1,:] = z[2,:];
-        dz[2,:] = g - k0 * u .* u ./((z[1,:] + I0).*(z[1,:] + I0));
+        dz[2,:] = 100*(g - k0 * u .* u ./((z[1,:] + I0).*(z[1,:] + I0)));   // 100 gives conversion to cms
         return dz;
     }
 
@@ -56,7 +56,7 @@ transformed parameters {
     // process model
     mu = rk4_update(h[:,1:no_obs], u[1:no_obs], theta, g, Ts); // this option was used for results in paper
     // measurement model
-    yhat[1,:] = h[1,1:no_obs];
+//    yhat[1,:] = h[1,1:no_obs];
 }
 model {
     r ~ normal(r_p_mu, r_p_std);
@@ -73,7 +73,7 @@ model {
     h[2,2:no_obs+1] ~ normal(mu[2,:], q[2]);
 
     // independent measurement likelihoods
-    y[:] ~ normal(yhat[1,:], r[1]);
+    y[:] ~ normal(h[1,1:no_obs], r[1]);
 }
 
 

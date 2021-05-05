@@ -29,19 +29,24 @@ if __name__ == "__main__":
     plot_bool = True
     #----------------- Parameters ---------------------------------------------------#
 
-    T = 500             # number of time steps to simulate and record measurements for
+    T = 200             # number of time steps to simulate and record measurements for
     Ts = 0.0004
+    cms = 100
     # true (simulation) parameters
-    z1_0 = 0.009  # initial position
-    z2_0 = 0.0  # initial velocity
-    r1_true = 0.0000002 # measurement noise standard deviation
-    q1_true = 0.0005 * Ts # process noise standard deviation
-    q2_true = 0.00005 * Ts 
+    z1_0 = cms*0.009  # initial position
+    z2_0 = cms*0.0  # initial velocity
+    # r1_true = cms*0.0000002 # measurement noise standard deviation
+    r1_true = 0.005
+    # q1_true = cms*0.0005 * Ts # process noise standard deviation
+    # q2_true = cms*0.00005 * Ts
+    q1_true = 1e-3
+    q2_true = 1e-3
+    # q2_true = 0.1
 
     # got these values from the data sheet
     Mb_true = 0.06 # kg, mass of the steel ball
     Ldiff_true = 0.04 # H, difference between coil L at zero and infinity (L(0) - L(inf))
-    x50_true = 0.002 # m, location in mode of L where L is 50% of the infinity and 0 L's
+    x50_true = cms*0.002 # m, location in mode of L where L is 50% of the infinity and 0 L's
     grav = 9.81
     k0_true = 0.5*x50_true*Ldiff_true/Mb_true
     I0_true = x50_true
@@ -63,7 +68,7 @@ if __name__ == "__main__":
     def maglev_gradient(xt, u, t): # uses the lumped parametersation 
         dx = jnp.zeros_like(xt)
         dx = index_update(dx, index[0, :], xt[1, :])
-        dx = index_update(dx, index[1, :], t['g'] - t['k0'] * u * u / (t['I0'] + xt[0,:]) / (t['I0'] + xt[0,:]))
+        dx = index_update(dx, index[1, :], cms*(t['g'] - t['k0'] * u * u / (t['I0'] + xt[0,:]) / (t['I0'] + xt[0,:])))
         return dx
 
     def current_current(xt,t): # expect a slice of x_hist to be xt, shape (2,)
@@ -117,7 +122,7 @@ if __name__ == "__main__":
     Kp = 100
     Ki = 5
     Kd = 3
-    reference = z1_0 - 0.002
+    reference = z1_0 - cms*0.002
     u = np.zeros((Nu,T), dtype=float)
     error = z1_0 - reference
     integrator = 0
@@ -145,12 +150,14 @@ if __name__ == "__main__":
     plt.subplot(2,1,1)
     plt.plot(u[0,:])
     plt.title('Simulated inputs and measurement used for inference')
+
     plt.subplot(2, 1, 2)
-    plt.plot(z_sim[0,:])
+    plt.plot(z_sim[0,0,:])
     plt.plot(y[0,:],linestyle='None',color='r',marker='*')
     plt.title('Simulated state 1 and measurements used for inferences')
     plt.tight_layout()
     plt.show()
+
 
     #----------- USE HMC TO PERFORM INFERENCE ---------------------------#
     # avoid recompiling
@@ -171,17 +178,32 @@ if __name__ == "__main__":
         'u':u[0,:],
         'g':grav,
         'z0_mu': np.array([z1_0,z2_0]),
-        'z0_std': np.array([q1_true,q2_true]),
+        'z0_std': np.array([0.2,0.2]),
         'theta_p_mu': np.array([I0_true, k0_true]),
-        'theta_p_std':0.05*np.array([I0_true, k0_true]),
+        'theta_p_std':1.0*np.array([I0_true, k0_true]),
         'r_p_mu': np.array([r1_true]),
-        'r_p_std': 0.05*np.array([r1_true]),
+        'r_p_std': np.array([0.1]),
         'q_p_mu': np.array([q1_true, q2_true]),
-        'q_p_std': 0.05*np.array([q1_true, q2_true]),
+        'q_p_std': np.array([0.1,0.1]),
         'Ts':Ts
     }
+    h_init = np.zeros((2, T+1))
+    h_init[0, :-1] = y[0, :]
+    h_init[0, -1] = y[0,-1]
+    h_init[1, :] = z_sim[1,0,:]     # todo: replace this with smoothed gradients of measurements, or something else sensible
+    theta_init = np.array([I0_true, k0_true])
 
-    fit = model.sampling(data=stan_data, warmup=1000, iter=2000, chains=1)
+    def init_function(ind):
+        output = dict(theta=theta_init,
+                      h=h_init,
+                      # q=last_pos[ind]['q'],
+                      # r=last_pos[ind]['r']
+                      )
+        return output
+
+    init = [init_function(0),init_function(1),init_function(2),init_function(3)]
+
+    fit = model.sampling(data=stan_data, warmup=1000, iter=2000, chains=4, init=init)
     traces = fit.extract()
 
     # state samples
