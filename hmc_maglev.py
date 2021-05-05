@@ -187,11 +187,39 @@ if __name__ == "__main__":
         'q_p_std': np.array([0.1,0.1]),
         'Ts':Ts
     }
+
+    v_init = np.zeros((1, T + 1))
+    span = 13  # has to be odd
+    for tt in range(T):
+        if tt - (span // 2) < 0:
+            ind_start = 0
+            ind_end = span
+        elif tt + (span // 2) + 1 > T:
+            ind_end = T
+            ind_start = T - span - 1
+        else:
+            ind_start = tt - (span // 2)
+            ind_end = tt + (span // 2) + 1
+        p = np.polyfit(np.arange(ind_start, ind_end), y[0, np.arange(ind_start, ind_end)], 2)
+        # v = np.polyval(p,np.arange(ind_start,ind_end))
+        # plt.plot(v)
+        # plt.plot(y[0,ind_start:ind_end])
+        # plt.show()
+        v_init[0, tt] = (2 * p[0] * tt + p[1]) / Ts
+
+    v_init[0, -1] = v_init[0, -2]
+
     h_init = np.zeros((2, T+1))
     h_init[0, :-1] = y[0, :]
     h_init[0, -1] = y[0,-1]
-    h_init[1, :] = z_sim[1,0,:]     # todo: replace this with smoothed gradients of measurements, or something else sensible
+    h_init[1, :] = v_init[0,:]     # smoothed gradients of measurements
     theta_init = np.array([I0_true, k0_true])
+
+
+
+    # plt.plot(v_init[0,:])
+    # plt.plot(z_sim[1,0,:])
+    # plt.show()
 
     def init_function(ind):
         output = dict(theta=theta_init,
@@ -203,7 +231,7 @@ if __name__ == "__main__":
 
     init = [init_function(0),init_function(1),init_function(2),init_function(3)]
 
-    fit = model.sampling(data=stan_data, warmup=1000, iter=2000, chains=4, init=init)
+    fit = model.sampling(data=stan_data, warmup=2000, iter=3000, chains=4, init=init)
     traces = fit.extract()
 
     # state samples
