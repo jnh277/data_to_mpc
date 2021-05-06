@@ -225,15 +225,15 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
                 'q_p_std': 0.05*np.array([q1_true, q2_true]),
                 }
 
-    v_init = np.zeros((1, T + 1))
+    v_init = np.zeros((1, t + 1))
     span = 13  # has to be odd
-    for tt in range(T):
+    for tt in range(t):
         if tt - (span // 2) < 0:
             ind_start = 0
             ind_end = span
-        elif tt + (span // 2) + 1 > T:
-            ind_end = T
-            ind_start = T - span - 1
+        elif tt + (span // 2) + 1 > t:
+            ind_end = t
+            ind_start = t - span - 1
         else:
             ind_start = tt - (span // 2)
             ind_end = tt + (span // 2) + 1
