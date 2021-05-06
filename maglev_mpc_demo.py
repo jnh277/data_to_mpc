@@ -180,7 +180,7 @@ gradient = jit(grad(log_barrier_cost, argnums=0), static_argnums=(11, 12, 13, 14
 hessian = jit(jacfwd(jacrev(log_barrier_cost, argnums=0)), static_argnums=(11, 12, 13, 14, 15))
 
 
-mu = 1
+mu = 1e4
 gamma = 1
 delta = 0.05
 max_iter = 5000
@@ -204,24 +204,54 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
     # apply u_t
     # this takes x_t to x_{t+1}
     # measure y_t
-    z_sim[:,:,[t+1]] = sim(z_sim[:,:,t],u[:,[t]],w_sim[:,:,[t]],theta_true)
+    z_sim[:,:,[t+1]] = simulate(z_sim[:,:,t],u[:,[t]],w_sim[:,:,[t]],theta_true)
     y[0, t] = z_sim[0, 0, t] + v[0, t]
     # y[2, t] = (u[0, t] - theta_true['Km'] * z_sim[2, 0, t]) / theta_true['Rm'] + v[2, t]
-
-
+    y_local = y[0, :t+1]
+    u_local = u[0, :t+1]
     # estimate system (estimates up to x_t)
     stan_data ={'no_obs': t+1,
                 'Ts':Ts,
-                'y': y[0, :t+1],
-                'u': u[0, :t+1],
+                'y': y_local,
+                'u': u_local,
                 'g':grav,
+                # 'z0_mu': np.array([z1_0,z2_0]),
+                # 'z0_std': np.array([0.2,0.2]),
                 'theta_p_mu':theta_p_mu,
-                'theta_p_std':0.0005*np.array([I0_true, k0_true]),
+                'theta_p_std':0.05*np.array([I0_true, k0_true]),
                 'r_p_mu': np.array([r1_true]),
-                'r_p_std': 0.0005*np.array([r1_true]),
+                'r_p_std': 0.05*np.array([r1_true]),
                 'q_p_mu': np.array([q1_true, q2_true]),
-                'q_p_std': 0.0005*np.array([q1_true, q2_true]),
+                'q_p_std': 0.05*np.array([q1_true, q2_true]),
                 }
+
+    v_init = np.zeros((1, T + 1))
+    span = 13  # has to be odd
+    for tt in range(T):
+        if tt - (span // 2) < 0:
+            ind_start = 0
+            ind_end = span
+        elif tt + (span // 2) + 1 > T:
+            ind_end = T
+            ind_start = T - span - 1
+        else:
+            ind_start = tt - (span // 2)
+            ind_end = tt + (span // 2) + 1
+        p = np.polyfit(np.arange(ind_start, ind_end), y[0, np.arange(ind_start, ind_end)], 2)
+        # v = np.polyval(p,np.arange(ind_start,ind_end))
+        # plt.plot(v)
+        # plt.plot(y[0,ind_start:ind_end])
+        # plt.show()
+        v_init[0, tt] = (2 * p[0] * tt + p[1]) / Ts
+
+    v_init[0, -1] = v_init[0, -2]
+
+    h_init = np.zeros((2, T+1))
+    h_init[0, :-1] = y[0, :]
+    h_init[0, -1] = y[0,-1]
+    h_init[1, :] = v_init[0,:]     # smoothed gradients of measurements
+    theta_init = np.array([I0_true, k0_true]) # ! start theta somewhere?
+
 
     with suppress_stdout_stderr():
         fit = model.sampling(data=stan_data, warmup=warmup, iter=iter, chains=chains)

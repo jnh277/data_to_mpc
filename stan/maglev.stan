@@ -37,8 +37,8 @@ data {
     real g;                             // gravity
     vector[2] theta_p_mu;               // prior means on theta
     vector[2] theta_p_std;              // prior stds on theta
-    vector[2] z0_mu;                    // initial state prior
-    vector[2] z0_std;
+    // vector[2] z0_mu;                    // initial state prior
+    // vector[2] z0_std;
     vector[1] r_p_mu;                   // measurement noise prior mean
     vector[1] r_p_std;                  // measurement noise prior std
     vector[2] q_p_mu;                   // process noise prior mean
@@ -66,7 +66,7 @@ model {
     theta ~ normal(theta_p_mu, theta_p_std);
 
     // initial state prior (Not using this / not needed)
-    h[:,1] ~ normal(z0_mu, z0_std);
+    // h[:,1] ~ normal(z0_mu, z0_std);
 
     // independent process likelihoods
     h[1,2:no_obs+1] ~ normal(mu[1,:], q[1]);
