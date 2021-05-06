@@ -172,7 +172,7 @@ if __name__ == "__main__":
     if Path(script_path+path+model_name+'.pkl').is_file():
         model = pickle.load(open(script_path+path+model_name+'.pkl', 'rb'))
     else:
-        model = pystan.StanModel(file=script_path+path+model_name+'.stan')
+        model = pystan.StanModel(file=script_path+path+model_name+'.stan',verbose=True)
         with open(script_path+path+model_name+'.pkl', 'wb') as file:
             pickle.dump(model, file)
 
