@@ -225,26 +225,30 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
                 'q_p_std': 0.05*np.array([q1_true, q2_true]),
                 }
 
-    v_init = np.zeros((1, t + 1))
-    span = 13  # has to be odd
-    for tt in range(t):
-        if tt - (span // 2) < 0:
-            ind_start = 0
-            ind_end = span
-        elif tt + (span // 2) + 1 > t:
-            ind_end = t
-            ind_start = t - span - 1
-        else:
-            ind_start = tt - (span // 2)
-            ind_end = tt + (span // 2) + 1
-        p = np.polyfit(np.arange(ind_start, ind_end), y[0, np.arange(ind_start, ind_end)], 2)
-        # v = np.polyval(p,np.arange(ind_start,ind_end))
-        # plt.plot(v)
-        # plt.plot(y[0,ind_start:ind_end])
-        # plt.show()
-        v_init[0, tt] = (2 * p[0] * tt + p[1]) / Ts
+    if t == 0 or t==1 or t==2:
+        v_init = np.zeros((1, t + 1))
+        # v_inti[]
+    else:
+        v_init = np.zeros((1, t + 1))
+        span = 3  # has to be odd
+        for tt in range(t):
+            if tt - (span // 2) < 0:
+                ind_start = 0
+                ind_end = span
+            elif tt + (span // 2) + 1 > t:
+                ind_end = t
+                ind_start = t - span - 1
+            else:
+                ind_start = tt - (span // 2)
+                ind_end = tt + (span // 2) + 1
+            p = np.polyfit(np.arange(ind_start, ind_end), y[0, np.arange(ind_start, ind_end)], 2)
+            # v = np.polyval(p,np.arange(ind_start,ind_end))
+            # plt.plot(v)
+            # plt.plot(y[0,ind_start:ind_end])
+            # plt.show()
+            v_init[0, tt] = (2 * p[0] * tt + p[1]) / Ts
 
-    v_init[0, -1] = v_init[0, -2]
+        v_init[0, -1] = v_init[0, -2]
 
     h_init = np.zeros((2, T+1))
     h_init[0, :-1] = y[0, :]
@@ -303,8 +307,7 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
                                          delta, simulate, state_constraints, input_constraints, verbose=2,
                                          max_iter=max_iter,mu=mu,gamma=gamma)
     else:
-        cc = current_current(xt,theta_mpc)
-        result = solve_chance_logbarrier(cc*np.ones((1, Nh)), cost, gradient, hessian, ut, xt, theta_mpc, w_mpc, z_star, sqc,
+        result = solve_chance_logbarrier(0.01*np.ones((1, Nh)), cost, gradient, hessian, ut, xt, theta_mpc, w_mpc, z_star, sqc,
                                          src,
                                          delta, simulate, state_constraints, input_constraints, verbose=2,
                                          max_iter=max_iter)
