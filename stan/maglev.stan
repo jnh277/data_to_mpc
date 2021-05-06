@@ -10,7 +10,7 @@ functions{
         real I0 = theta[1];
         // row_vector[pdims[2]] dz2 = 
         dz[1,:] = z[2,:];
-        dz[2,:] = 100*(g - k0 * u .* u ./((z[1,:] + I0).*(z[1,:] + I0)));   // 100 gives conversion to cms
+        dz[2,:] = (g - k0 * u .* u ./((z[1,:] + I0).*(z[1,:] + I0)));   // 100 gives conversion to cms
         return dz;
     }
 

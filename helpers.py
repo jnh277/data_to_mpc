@@ -148,7 +148,7 @@ def plot_trace(param,num_plots,pos, param_name='parameter',save=False):
     plt.gcf().tight_layout()
     plt.legend()
 
-def plot_trace_grid(param,row,col,pos, param_name='parameter',save=False):
+def plot_trace_grid(param,row,col,pos, param_name='parameter',true_val=None,save=False):
     """Plot the trace and posterior of a parameter."""
 
     # Summary statistics
@@ -166,7 +166,8 @@ def plot_trace_grid(param,row,col,pos, param_name='parameter',save=False):
     plt.axvline(median, color='c', lw=2, linestyle='--', label='median')
     plt.axvline(cred_min, linestyle=':', color='k', alpha=0.2, label='95% CI')
     plt.axvline(cred_max, linestyle=':', color='k', alpha=0.2)
-
+    if true_val:
+        plt.axvline(true_val, linestyle='--', color='g', label='True Value')
     plt.gcf().tight_layout()
     plt.legend()
 

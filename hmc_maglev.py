@@ -30,7 +30,7 @@ if __name__ == "__main__":
     #----------------- Parameters ---------------------------------------------------#
 
     T = 200             # number of time steps to simulate and record measurements for
-    Ts = 0.0004
+    Ts = 0.004
     cms = 100
     # true (simulation) parameters
     z1_0 = cms*0.009  # initial position
@@ -39,15 +39,15 @@ if __name__ == "__main__":
     r1_true = 0.005
     # q1_true = cms*0.0005 * Ts # process noise standard deviation
     # q2_true = cms*0.00005 * Ts
-    q1_true = 1e-3
-    q2_true = 1e-3
+    q1_true = 0.1 * Ts
+    q2_true = 0.01 * Ts
     # q2_true = 0.1
 
     # got these values from the data sheet
     Mb_true = 0.06 # kg, mass of the steel ball
-    Ldiff_true = 0.04 # H, difference between coil L at zero and infinity (L(0) - L(inf))
-    x50_true = cms*0.002 # m, location in mode of L where L is 50% of the infinity and 0 L's
-    grav = 9.81
+    Ldiff_true = 0.04 * cms * cms # 100*100*H, or kg * cm^2 ­* s^-2 *­ A^-2 difference between coil L at zero and infinity (L(0) - L(inf))
+    x50_true = cms * 0.002 # cm, location in mode of L where L is 50% of the infinity and 0 L's
+    grav = 9.81 * cms # gravity in cm/s
     k0_true = 0.5*x50_true*Ldiff_true/Mb_true
     I0_true = x50_true
     theta_true = {
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     def maglev_gradient(xt, u, t): # uses the lumped parametersation 
         dx = jnp.zeros_like(xt)
         dx = index_update(dx, index[0, :], xt[1, :])
-        dx = index_update(dx, index[1, :], cms*(t['g'] - t['k0'] * u * u / (t['I0'] + xt[0,:]) / (t['I0'] + xt[0,:])))
+        dx = index_update(dx, index[1, :], (t['g'] - t['k0'] * u * u / (t['I0'] + xt[0,:]) / (t['I0'] + xt[0,:])))
         return dx
 
     def current_current(xt,t): # expect a slice of x_hist to be xt, shape (2,)
@@ -119,9 +119,9 @@ if __name__ == "__main__":
     # u = current_current(z_sim[:,0,0],theta_true) * np.ones((Nu,T), dtype=float)
     # u += u_noise
     # some random error state PID I made up
-    Kp = 100
-    Ki = 5
-    Kd = 3
+    Kp = 10 / cms 
+    Ki = 2 / cms 
+    Kd = 2 / cms 
     reference = z1_0 - cms*0.002
     u = np.zeros((Nu,T), dtype=float)
     error = z1_0 - reference
@@ -136,6 +136,9 @@ if __name__ == "__main__":
             integrator += error * Ts
             difference += error
             difference /= Ts
+            if k > T/2:
+                reference = z1_0
+                error = z_sim[0,:,k + 1] - reference
             u[:,k+1] = current_current(z_sim[:,0,k+1],theta_true) + Kp * error +  Ki * integrator + Kd * difference
 
     # draw measurement noise
@@ -249,12 +252,12 @@ if __name__ == "__main__":
     q2plt = q_samps[1,:].squeeze()
     r1plt = r_samps[0,:].squeeze()
 
-    plot_trace_grid(I0_samps,1,5,1,'I0')
+    plot_trace_grid(I0_samps,1,5,1,'I0',true_val=I0_true)
     plt.title('HMC inferred parameters')
-    plot_trace_grid(k0_samps,1,5,2,'k0')
-    plot_trace_grid(q1plt,1,5,3,'q1')
-    plot_trace_grid(q1plt,1,5,4,'q2')
-    plot_trace_grid(r1plt,1,5,5,'r1')
+    plot_trace_grid(k0_samps,1,5,2,'k0',true_val=k0_true)
+    plot_trace_grid(q1plt,1,5,3,'q1',true_val=q1_true)
+    plot_trace_grid(q1plt,1,5,4,'q2',true_val=q2_true)
+    plot_trace_grid(r1plt,1,5,5,'r1',true_val=r1_true)
     plt.show()
 
     # # plot some of the initial marginal state estimates
