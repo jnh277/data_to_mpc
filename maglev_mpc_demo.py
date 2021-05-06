@@ -22,6 +22,11 @@
     presaved results are included and can be plotted without running this script """
 """ The results can then be plotted using the script 'plot_pendulum_results.py' """
 
+# import os
+import platform
+if platform.system()=='Darwin':
+    import multiprocessing
+    multiprocessing.set_start_method("fork")
 # general imports
 import pystan
 import numpy as np
@@ -37,14 +42,13 @@ from jax import grad, jit, jacfwd, jacrev
 from jax.lax import scan
 from jax.ops import index, index_update
 from jax.config import config
+config.update("jax_enable_x64", True)           # run jax in 64 bit mode for accuracy, or just do it 64-bit arith on CPU
 
 # optimisation module imports (needs to be done before the jax confix update)
 from optimisation import solve_chance_logbarrier, log_barrier_cost
 
-config.update("jax_enable_x64", True)           # run jax in 64 bit mode for accuracy, or just do it 64-bit arith on CPU
-
 # Control parameters
-z_star = np.array([[0.008],[0.0]],dtype=float)        # desired set point in z1
+z_star = np.array([[8],[0.0]],dtype=float)        # desired set point in z1 ( cm)
 Ns = 200             # number of samples we will use for MC MPC
 Nh = 13              # horizonline of MPC algorithm
 sqc_v = np.array([10.,10.],dtype=float) # cost on state error
@@ -52,10 +56,10 @@ sqc = np.diag(sqc_v)
 src = np.array([[0.0000001]]) # cost on the input
 
 # define the state constraints, (these need to be tuples)
-position_upper_bound = 0.014 # m -- location of the post
-position_lower_bound = 0.0 # m, location of the electromagnet
+position_upper_bound = 14.0 # cm -- location of the post
+position_lower_bound = 0.0 # cm, location of the electromagnet
 input_upper_bound = 24 # amps
-input_lower_bound = -0.0001
+input_lower_bound = 0.0 # amps
 state_constraints = (lambda z: position_lower_bound + z[[0],:,:],lambda z: -z[[0],:,:] + position_upper_bound)
 input_constraints = (lambda u: input_upper_bound-u, lambda u: u + input_lower_bound)
 
@@ -63,18 +67,18 @@ input_constraints = (lambda u: input_upper_bound-u, lambda u: u + input_lower_bo
 # WARNING DONT MAKE T > 100 due to size of saved inv_metric
 T = 2             # number of time steps to simulate and record measurements for
 Ts = 0.004 # 250Hz ... 
-z1_0 = 0.009
-z2_0 = 0.0
+z1_0 = 9.0 # cm
+z2_0 = 0.0 # cm/s
 
-r1_true = 0.0002        # measurement noise standard deviation
-q1_true = 1e-6       # process noise standard deviation
-q2_true = 1e-7       # process noise standard deviation
+r1_true = 0.05       # measurement noise standard deviation
+q1_true = 0.1*Ts       # process noise standard deviation
+q2_true = 0.01*Ts       # process noise standard deviation
 
 # got these values from the data sheet
 Mb_true = 0.06 # kg, mass of the steel ball
-Ldiff_true = 0.04 # H, difference between coil L at zero and infinity (L(0) - L(inf))
-x50_true = 0.002 # m, location in mode of L where L is 50% of the infinity and 0 L's
-grav = 9.81
+Ldiff_true = 0.04 * 100 * 100 # 100*100*H, or kg * cm^2 ­* s^-2 *­ A^-2 difference between coil L at zero and infinity (L(0) - L(inf))
+x50_true = 2 # cm, location in mode of L where L is 50% of the infinity and 0 L's
+grav = 9.81 * 100 # cm/s/s
 k0_true = 0.5*x50_true*Ldiff_true/Mb_true
 I0_true = x50_true
 theta_true = {
@@ -104,8 +108,9 @@ def maglev_gradient(xt, u, t): # uses the lumped parametersation
     dx = index_update(dx, index[0, :], xt[1, :])
     dx = index_update(dx, index[1, :], t['g'] - t['k0'] * u * u / (t['I0'] + xt[0,:]) / (t['I0'] + xt[0,:]))
     return dx
-def current_current(xt,t):
-    return np.sqrt(t['g']/t['k0'].mean())*(xt[0,:].mean() + t['I0'].mean())
+    
+def current_current(xt,t): # expect a slice of x_hist to be xt, shape (2,)
+    return np.sqrt(t['g']/t['k0'])*(xt[0] + t['I0'])
 
 def rk4(xt, ut, theta):
     h = theta['h']
@@ -115,6 +120,7 @@ def rk4(xt, ut, theta):
     k4 = maglev_gradient(xt + k3 * h, ut, theta)
     return xt + (k1 / 6 + k2 / 3 + k3 / 3 + k4 / 6) * h  # should handle a 2D x just fine
 
+@jit
 def simulate(xt, u, w,
                   theta):  # w is expected to be 3D. xt is expected to be 2D. ut is expected to be 2d but also, should handle being a vector (3d)
     [Nx, Ns, Np1] = w.shape
@@ -134,8 +140,6 @@ def scan_func(carry,ii):
     carry['x'] = index_update(carry['x'], index[:, :, ii + 1], rk4(carry['x'][:, :, ii], carry['u'][:, ii], carry['theta']) + carry['w'][:, :, ii])
     return carry, []
 
-sim = jit(simulate)
-
 # Pack true parameters
 # theta_true = fill_theta(theta_true) 
 
@@ -147,15 +151,15 @@ v = np.array([[r1_true]])*np.random.randn(Ny,T)
 y = np.zeros((Ny, T), dtype=float)
 
 # initial state
-z_sim[0,:,0] = z1_0
-z_sim[1,:,0] = z2_0
+z_sim[0,0,0] = z1_0
+z_sim[1,0,0] = z2_0
 
 
 ### hmc parameters and set up the hmc model
-warmup = 300
+warmup = 2000
 chains = 4
 iter = warmup + int(Ns/chains)
-model_name = 'pendulum_diag'
+model_name = 'maglev'
 path = 'stan/'
 if Path(path+model_name+'.pkl').is_file():
     model = pickle.load(open(path+model_name+'.pkl', 'rb'))

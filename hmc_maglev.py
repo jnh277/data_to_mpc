@@ -36,7 +36,7 @@ if __name__ == "__main__":
     z1_0 = cms*0.009  # initial position
     z2_0 = cms*0.0  # initial velocity
     # r1_true = cms*0.0000002 # measurement noise standard deviation
-    r1_true = 0.005
+    r1_true = 0.005 # cm stdev
     # q1_true = cms*0.0005 * Ts # process noise standard deviation
     # q2_true = cms*0.00005 * Ts
     q1_true = 0.1 * Ts
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     Mb_true = 0.06 # kg, mass of the steel ball
     Ldiff_true = 0.04 * cms * cms # 100*100*H, or kg * cm^2 ­* s^-2 *­ A^-2 difference between coil L at zero and infinity (L(0) - L(inf))
     x50_true = cms * 0.002 # cm, location in mode of L where L is 50% of the infinity and 0 L's
-    grav = 9.81 * cms # gravity in cm/s
+    grav = 9.81 * cms # gravity in cm/s/s
     k0_true = 0.5*x50_true*Ldiff_true/Mb_true
     I0_true = x50_true
     theta_true = {
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     def maglev_gradient(xt, u, t): # uses the lumped parametersation 
         dx = jnp.zeros_like(xt)
         dx = index_update(dx, index[0, :], xt[1, :])
-        dx = index_update(dx, index[1, :], (t['g'] - t['k0'] * u * u / (t['I0'] + xt[0,:]) / (t['I0'] + xt[0,:])))
+        dx = index_update(dx, index[1, :], t['g'] - t['k0'] * u * u / (t['I0'] + xt[0,:]) / (t['I0'] + xt[0,:]))
         return dx
 
     def current_current(xt,t): # expect a slice of x_hist to be xt, shape (2,)
@@ -114,41 +114,43 @@ if __name__ == "__main__":
     w_sim[0,0,:] = np.random.normal(0.0, q1_true, T)
     w_sim[1,0,:] = np.random.normal(0.0, q2_true, T)
 
-    # create some inputs that are a step from one equilibrium to another
-    # u_noise = 0.001*np.sin(np.arange(500)*2*np.pi*5/500)
-    # u = current_current(z_sim[:,0,0],theta_true) * np.ones((Nu,T), dtype=float)
-    # u += u_noise
-    # some random error state PID I made up
+    # draw measurement noise
+    v = np.zeros((Ny,T+1), dtype=float)
+    v[0,:] = np.random.normal(0.0, r1_true, T+1)
+
+    # simulated measurements 
+    y = np.zeros((Ny,T+1), dtype=float)
+
+    # some random error state PID that stabilises the system
     Kp = 10 / cms 
     Ki = 2 / cms 
     Kd = 2 / cms 
     reference = z1_0 - cms*0.002
     u = np.zeros((Nu,T), dtype=float)
-    error = z1_0 - reference
+    y[0,0] = z1_0 + v[0,0]
+    error = y[0,0] - reference
     integrator = 0
     difference = 0
-    u[:,0] = current_current(z_sim[:,0,0],theta_true) + Kp * error +  Ki * integrator + Kd * difference
+    u[:,0] = current_current(y[[0],0],theta_true) + Kp * error +  Ki * integrator + Kd * difference
     for k in np.arange(T):
         z_sim[:,:,[k+1]] = simulate(z_sim[:,:,k],u[:,[k]],w_sim[:,:,[k]],theta_true)
+        y[0,k+1] = z_sim[0,0,k+1] + v[0,k+1]
         if k < T - 1:
             difference = -error
-            error = z_sim[0,:,k + 1] - reference
+            error = y[0,k+1] - reference
             integrator += error * Ts
             difference += error
             difference /= Ts
             if k > T/2:
                 reference = z1_0
-                error = z_sim[0,:,k + 1] - reference
-            u[:,k+1] = current_current(z_sim[:,0,k+1],theta_true) + Kp * error +  Ki * integrator + Kd * difference
+                error = y[0,k+1] - reference
+            u[:,k+1] = current_current(y[[0],k+1],theta_true) + Kp * error +  Ki * integrator + Kd * difference
 
-    # draw measurement noise
-    v = np.zeros((Ny,T), dtype=float)
-    v[0,:] = np.random.normal(0.0, r1_true, T)
+    
 
-    # simulated measurements 
-    y = np.zeros((Ny,T), dtype=float)
-    y[0,:] = z_sim[0,0,:-1]
-    y = y + v; # add noise to measurements
+    y = y[[0],:-1]
+    # y[0,:] = z_sim[0,0,:-1]
+    # y = y + v; # add noise to measurements
 
     plt.subplot(2,1,1)
     plt.plot(u[0,:])
@@ -216,7 +218,7 @@ if __name__ == "__main__":
     h_init[0, :-1] = y[0, :]
     h_init[0, -1] = y[0,-1]
     h_init[1, :] = v_init[0,:]     # smoothed gradients of measurements
-    theta_init = np.array([I0_true, k0_true])
+    theta_init = np.array([I0_true, k0_true]) # start theta somewhere?
 
 
 
