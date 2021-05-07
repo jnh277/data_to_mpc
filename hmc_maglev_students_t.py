@@ -70,7 +70,7 @@ if __name__ == "__main__":
     def maglev_gradient(xt, u, t): # uses the lumped parametersation 
         dx = jnp.zeros_like(xt)
         dx = index_update(dx, index[0, :], xt[1, :])
-        dx = index_update(dx, index[1, :], t['g'] - t['k0'] * u * u / (t['I0'] + xt[0,:]) / (t['I0'] + xt[0,:]))
+        dx = index_update(dx, index[1, :], t['g'] - t['k0'] * u[0,:] * u[0,:] / (t['I0'] + xt[0,:]) / (t['I0'] + xt[0,:]))
         return dx
 
     def current_current(xt,t): # expect a slice of x_hist to be xt, shape (2,)
@@ -88,7 +88,7 @@ if __name__ == "__main__":
     def simulate(xt, u, w,
                     theta):  # w is expected to be 3D. xt is expected to be 2D. ut is expected to be 2d but also, should handle being a vector (3d)
         [Nx, Ns, Np1] = w.shape
-        x = jnp.zeros((Nx, Ns, Np1 + 1))
+        x = jnp.zeros((2, Ns, Np1 + 1))
         x = index_update(x, index[:, :, 0], xt)
         iis = jnp.arange(Np1)
         dict = {
@@ -165,119 +165,119 @@ if __name__ == "__main__":
     plt.show()
 
 
-    # #----------- USE HMC TO PERFORM INFERENCE ---------------------------#
-    # # avoid recompiling
-    # script_path = os.path.dirname(os.path.realpath(__file__))
-    # model_name = 'maglev'
-    # path = '/stan/'
-    # if Path(script_path+path+model_name+'.pkl').is_file():
-    #     model = pickle.load(open(script_path+path+model_name+'.pkl', 'rb'))
-    # else:
-    #     model = pystan.StanModel(file=script_path+path+model_name+'.stan',verbose=True)
-    #     with open(script_path+path+model_name+'.pkl', 'wb') as file:
-    #         pickle.dump(model, file)
+    #----------- USE HMC TO PERFORM INFERENCE ---------------------------#
+    # avoid recompiling
+    script_path = os.path.dirname(os.path.realpath(__file__))
+    model_name = 'maglev_2'
+    path = '/stan/'
+    if Path(script_path+path+model_name+'.pkl').is_file():
+        model = pickle.load(open(script_path+path+model_name+'.pkl', 'rb'))
+    else:
+        model = pystan.StanModel(file=script_path+path+model_name+'.stan')
+        with open(script_path+path+model_name+'.pkl', 'wb') as file:
+            pickle.dump(model, file)
 
-    # stan_data = {
-    #     'no_obs': T,
-    #     'N':T,
-    #     'y':y[0,:],
-    #     'u':u[0,:],
-    #     'g':grav,
-    #     'z0_mu': np.array([z1_0,z2_0]),
-    #     'z0_std': np.array([0.2,0.2]),
-    #     'theta_p_mu': np.array([I0_true, k0_true]),
-    #     'theta_p_std':1.0*np.array([I0_true, k0_true]),
-    #     'r_p_mu': np.array([r1_true]),
-    #     'r_p_std': np.array([0.1]),
-    #     'q_p_mu': np.array([q1_true, q2_true]),
-    #     'q_p_std': np.array([0.1,0.1]),
-    #     'Ts':Ts
-    # }
+    stan_data = {
+        'no_obs': T,
+        'N':T,
+        'y':y[0,:],
+        'u':u[0,:],
+        'g':grav,
+        'z0_mu': np.array([z1_0,z2_0]),
+        'z0_std': np.array([0.2,0.2]),
+        'theta_p_mu': np.array([I0_true, k0_true]),
+        'theta_p_std':1.0*np.array([I0_true, k0_true]),
+        'r_p_mu': np.array([r1_true]),
+        'r_p_std': np.array([0.1]),
+        'q_p_mu': np.array([q1_true]),
+        'q_p_std': np.array([0.1]),
+        'Ts':Ts
+    }
 
-    # v_init = np.zeros((1, T + 1))
-    # span = 13  # has to be odd
-    # for tt in range(T):
-    #     if tt - (span // 2) < 0:
-    #         ind_start = 0
-    #         ind_end = span
-    #     elif tt + (span // 2) + 1 > T:
-    #         ind_end = T
-    #         ind_start = T - span - 1
-    #     else:
-    #         ind_start = tt - (span // 2)
-    #         ind_end = tt + (span // 2) + 1
-    #     p = np.polyfit(np.arange(ind_start, ind_end), y[0, np.arange(ind_start, ind_end)], 2)
-    #     # v = np.polyval(p,np.arange(ind_start,ind_end))
-    #     # plt.plot(v)
-    #     # plt.plot(y[0,ind_start:ind_end])
-    #     # plt.show()
-    #     v_init[0, tt] = (2 * p[0] * tt + p[1]) / Ts
+    v_init = np.zeros((1, T + 1))
+    span = 13  # has to be odd
+    for tt in range(T):
+        if tt - (span // 2) < 0:
+            ind_start = 0
+            ind_end = span
+        elif tt + (span // 2) + 1 > T:
+            ind_end = T
+            ind_start = T - span - 1
+        else:
+            ind_start = tt - (span // 2)
+            ind_end = tt + (span // 2) + 1
+        p = np.polyfit(np.arange(ind_start, ind_end), y[0, np.arange(ind_start, ind_end)], 2)
+        # v = np.polyval(p,np.arange(ind_start,ind_end))
+        # plt.plot(v)
+        # plt.plot(y[0,ind_start:ind_end])
+        # plt.show()
+        v_init[0, tt] = (2 * p[0] * tt + p[1]) / Ts
 
-    # v_init[0, -1] = v_init[0, -2]
+    v_init[0, -1] = v_init[0, -2]
 
-    # h_init = np.zeros((2, T+1))
-    # h_init[0, :-1] = y[0, :]
-    # h_init[0, -1] = y[0,-1]
-    # h_init[1, :] = v_init[0,:]     # smoothed gradients of measurements
-    # theta_init = np.array([I0_true, k0_true]) # start theta somewhere?
+    h_init = np.zeros((2, T+1))
+    h_init[0, :-1] = y[0, :]
+    h_init[0, -1] = y[0,-1]
+    h_init[1, :] = v_init[0,:]     # smoothed gradients of measurements
+    theta_init = np.array([I0_true, k0_true]) # start theta somewhere?
 
 
 
-    # # plt.plot(v_init[0,:])
-    # # plt.plot(z_sim[1,0,:])
-    # # plt.show()
+    # plt.plot(v_init[0,:])
+    # plt.plot(z_sim[1,0,:])
+    # plt.show()
 
-    # def init_function(ind):
-    #     output = dict(theta=theta_init,
-    #                   h=h_init,
-    #                   # q=last_pos[ind]['q'],
-    #                   # r=last_pos[ind]['r']
-    #                   )
-    #     return output
+    def init_function(ind):
+        output = dict(theta=theta_init,
+                      init=h_init[:,0],
+                      # q=last_pos[ind]['q'],
+                      # r=last_pos[ind]['r']
+                      )
+        return output
 
-    # init = [init_function(0),init_function(1),init_function(2),init_function(3)]
+    init = [init_function(0),init_function(1),init_function(2),init_function(3)]
 
-    # fit = model.sampling(data=stan_data, warmup=5000, iter=7000, chains=4, init=init)
-    # traces = fit.extract()
+    fit = model.sampling(data=stan_data, warmup=5000, iter=7000, chains=4, init=init)
+    traces = fit.extract()
     # inv_metric = fit.get_inv_metric()
 
-    # last_pos = fit.get_last_position()
-    # # for ii in range(4):
-    # #     last_pos.append(dict(theta=traces['theta'][(ii+1)*1000 - 1,:],
-    # #                          q=traces['q'][(ii+1)*1000 - 1,:],
-    # #                          r=traces['r'][(ii+1)*1000 - 1,:]))
+    last_pos = fit.get_last_position()
+    # for ii in range(4):
+    #     last_pos.append(dict(theta=traces['theta'][(ii+1)*1000 - 1,:],
+    #                          q=traces['q'][(ii+1)*1000 - 1,:],
+    #                          r=traces['r'][(ii+1)*1000 - 1,:]))
 
-    # with open('stan_traces/last_pos_maglev.pkl','wb') as file:
-    #     pickle.dump(last_pos, file)
+    with open('stan_traces/last_pos_maglev_st.pkl','wb') as file:
+        pickle.dump(last_pos, file)
 
-    # with open('stan_traces/inv_metric_maglev.pkl','wb') as file:
+    # with open('stan_traces/inv_metric_maglev_st.pkl','wb') as file:
     #     pickle.dump(inv_metric, file)
 
-    # # with open('stan_traces/that_inv_metric.pkl','wb') as file:
-    # #     pickle.dump(inv_metric_dict, file)
+    # with open('stan_traces/that_inv_metric.pkl','wb') as file:
+    #     pickle.dump(inv_metric_dict, file)
 
-    # # state samples
-    # z_samps = np.transpose(traces['h'],(1,0,2)) # Ns, Nx, T --> Nx, Ns, T
-    # theta_samps = traces['theta']
+    # state samples
+    w_samps = np.transpose(traces['w'],(1,0,2)) # Ns, Nx, T --> Nx, Ns, T
+    theta_samps = traces['theta']
 
-    # # parameter samples
-    # I0_samps = theta_samps[:, 0].squeeze()
-    # k0_samps = theta_samps[:, 1].squeeze()
-    # r_samps = traces['r'].transpose()
-    # q_samps = traces['q'].transpose()
+    # parameter samples
+    I0_samps = theta_samps[:, 0].squeeze()
+    k0_samps = theta_samps[:, 1].squeeze()
+    r_samps = traces['r'].transpose()
+    q_samps = traces['q'].transpose()
 
-    # # plot the initial parameter marginal estimates
-    # q1plt = q_samps[0,:].squeeze()
+    # plot the initial parameter marginal estimates
+    q1plt = q_samps[0,:].squeeze()
     # q2plt = q_samps[1,:].squeeze()
-    # r1plt = r_samps[0,:].squeeze()
+    r1plt = r_samps[0,:].squeeze()
 
-    # plot_trace_grid(I0_samps,1,5,1,'I0',true_val=I0_true)
-    # plt.title('HMC inferred parameters')
-    # plot_trace_grid(k0_samps,1,5,2,'k0',true_val=k0_true)
-    # plot_trace_grid(q1plt,1,5,3,'q1',true_val=q1_true)
+    plot_trace_grid(I0_samps,1,4,1,'I0',true_val=I0_true)
+    plt.title('HMC inferred parameters')
+    plot_trace_grid(k0_samps,1,4,2,'k0',true_val=k0_true)
+    plot_trace_grid(q1plt,1,4,3,'q1',true_val=q1_true)
     # plot_trace_grid(q1plt,1,5,4,'q2',true_val=q2_true)
-    # plot_trace_grid(r1plt,1,5,5,'r1',true_val=r1_true)
-    # plt.show()
+    plot_trace_grid(r1plt,1,4,4,'r1',true_val=r1_true)
+    plt.show()
 
     # # plot some of the initial marginal state estimates
     # for i in range(4):

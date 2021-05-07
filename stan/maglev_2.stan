@@ -8,7 +8,7 @@ functions{
         matrix[pdims[1],pdims[2]] dz;
         real k0 = theta[2];
         real I0 = theta[1];
-        // row_vector[pdims[2]] dz2 = 
+        // row_vector[pdims[2]] dz2 =
         dz[1,:] = z[2,:];
         dz[2,:] = (g - k0 * u .* u ./((z[1,:] + I0).*(z[1,:] + I0)));   // 100 gives conversion to cms
         return dz;
@@ -41,46 +41,47 @@ data {
     // vector[2] z0_std;
     vector[1] r_p_mu;                   // measurement noise prior mean
     vector[1] r_p_std;                  // measurement noise prior std
-    vector[2] q_p_mu;                   // process noise prior mean
-    vector[2] q_p_std;                  // process noise prior std
+    vector[1] q_p_mu;                   // process noise prior mean
+    vector[1] q_p_std;                  // process noise prior std
 }
 parameters {
     matrix[2,no_obs+1] h;                     // hidden states
     row_vector[no_obs] w;                       // noise realisation
+    vector[2] init;
     vector<lower=0.0>[2] theta;             // the parameters  [I0, k0]
     vector<lower=1e-8>[1] r;                 // iid measurement noise student's t scale parameter
-    vector<lower=1.0>[1] r_df;                // df parameter
+    vector<lower=1.0>[1] df_r;                // df parameter
     vector<lower=1e-8>[1] q;                 // iid input noise injection scale parameter
-    vector<lower=1.0>[1] q_df;                // df parameter
+    vector<lower=1.0>[1] df_q;                // df parameter
 }
 transformed parameters {
-    matrix[2, no_obs+1] mu;
-    matrix[1, no_obs] yhat;
+    matrix[2, no_obs] mu;
+    // matrix[1, no_obs] yhat;
     // process model
-    h[:,2:no_obs+1] = rk4_update(h[:,1:no_obs], u[1:no_obs] + w[1:no_obs], theta, g, Ts); // this option was used for results in paper
+    mu[:,1:no_obs] = rk4_update(h[:,1:no_obs], u[1:no_obs] + w[1:no_obs], theta, g, Ts); // this option was used for results in paper
     // measurement model
 //    yhat[1,:] = h[1,1:no_obs];
 }
 model {
-    r_df ~ gamma(2, 0.1); // according to https://jrnold.github.io/bayesian_notes/robust-regression.html
-    q_df ~ gamma(2, 0.1); // according to https://jrnold.github.io/bayesian_notes/robust-regression.html
+    df_r ~ gamma(2, 0.1); // according to https://jrnold.github.io/bayesian_notes/robust-regression.html
+    df_q ~ gamma(2, 0.1); // according to https://jrnold.github.io/bayesian_notes/robust-regression.html
     r ~ normal(r_p_mu, r_p_std);
     q ~ normal(q_p_mu, q_p_std);
 
-    w[1:no_obs] ~ student_t(df_q[0],0,q[0])
+    w[1:no_obs] ~ student_t(df_q[1],0,q[1]);
 
     // parameter priors
     theta ~ normal(theta_p_mu, theta_p_std);
-
+    // init ~ normal(z0_mu,z0_std);
     // initial state prior (Not using this / not needed)
-    // h[:,1] ~ normal(z0_mu, z0_std);
 
     // independent process likelihoods
-    // h[1,2:no_obs+1] ~ normal(mu[1,:], q[1]);
-    // h[2,2:no_obs+1] ~ normal(mu[2,:], q[2]);
+    // h[1,2:no_obs+1] = mu[1,:];
+    // h[2,2:no_obs+1] = mu[2,:];
 
     // independent measurement likelihoods
-    y[:] ~ student_t(df_r[1],h[1,1:no_obs], r[1]);
+    y[1] ~ student_t(df_r[1],init,r[1]);
+    y[2:no_obs] ~ student_t(df_r[1],mu[1,1:no_obs-1], r[1]);
 }
 
 
