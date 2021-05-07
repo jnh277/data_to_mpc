@@ -169,9 +169,9 @@ else:
         pickle.dump(model, file)
 
 # load hmc warmup
-# inv_metric = pickle.load(open('stan_traces/inv_metric.pkl','rb'))
+inv_metric = pickle.load(open('stan_traces/inv_metric_maglev.pkl','rb'))
 # stepsize = pickle.load(open('stan_traces/step_size.pkl','rb'))
-# last_pos = pickle.load(open('stan_traces/last_pos.pkl','rb'))
+last_pos = pickle.load(open('stan_traces/last_pos_maglev.pkl','rb'))
 
 
 # define MPC cost, gradient and hessian function
@@ -225,40 +225,44 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
                 'q_p_std': 0.05*np.array([q1_true, q2_true]),
                 }
 
-    if t == 0 or t==1 or t==2:
-        v_init = np.zeros((1, t + 1))
-        # v_inti[]
+    inv_metric = pickle.load(open('stan_traces/inv_metric_maglev.pkl', 'rb'))
+    this_inv_metric = inv_metric.copy()
+    for cc in range(4):
+        this_inv_metric[cc] = np.hstack((inv_metric[cc][0:t+2],
+                                         inv_metric[cc][101:101+t+2],
+                                         inv_metric[cc][202:202+t+2],
+                                         inv_metric[cc][303:303+t+2],
+                                         inv_metric[cc][-13:]))
+
+    if t == 0:
+        z_init = np.hstack((np.array([[z1_0], [z2_0]]),
+                                        z_sim[:,0,[t+1]]))
+        
     else:
-        v_init = np.zeros((1, t + 1))
-        span = 3  # has to be odd
-        for tt in range(t):
-            if tt - (span // 2) < 0:
-                ind_start = 0
-                ind_end = span
-            elif tt + (span // 2) + 1 > t:
-                ind_end = t
-                ind_start = t - span - 1
-            else:
-                ind_start = tt - (span // 2)
-                ind_end = tt + (span // 2) + 1
-            p = np.polyfit(np.arange(ind_start, ind_end), y[0, np.arange(ind_start, ind_end)], 2)
-            # v = np.polyval(p,np.arange(ind_start,ind_end))
-            # plt.plot(v)
-            # plt.plot(y[0,ind_start:ind_end])
-            # plt.show()
-            v_init[0, tt] = (2 * p[0] * tt + p[1]) / Ts
+        z_init = np.zeros((Nx, t + 2))
+        z_init[0, :-1] = y[0, :t+1]
+        z_init[0, -1] = y[0, t]  # repeat last entry
+        z_init[1, :-1] = np.gradient(y[0, :t+1]) / Ts
+        z_init[1, -1] = z_init[1, -2]
 
-        v_init[0, -1] = v_init[0, -2]
+    # chain initialisation
+    def init_function(ind):
+        output = dict(theta=last_pos[ind]['theta'],
+                      h=z_init,
+                      q=last_pos[ind]['q'],
+                      r=last_pos[ind]['r']
+                      )
+        return output
+    init = [init_function(0),init_function(1),init_function(2),init_function(3)] # intialise the number of chains
 
-    h_init = np.zeros((2, T+1))
-    h_init[0, :-1] = y[0, :]
-    h_init[0, -1] = y[0,-1]
-    h_init[1, :] = v_init[0,:]     # smoothed gradients of measurements
-    theta_init = np.array([I0_true, k0_true]) # ! start theta somewhere?
-
+    control = {"adapt_delta": 0.85,
+               "max_treedepth": 13,
+            #    "stepsize": stepsize,
+               "inv_metric": this_inv_metric,
+               "adapt_engaged": True}
 
     with suppress_stdout_stderr():
-        fit = model.sampling(data=stan_data, warmup=warmup, iter=iter, chains=chains)
+        fit = model.sampling(data=stan_data, warmup=warmup, iter=iter, chains=chains,init=init,control=control)
     traces = fit.extract()
     hmc_traces_save.append(traces)
 

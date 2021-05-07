@@ -6,6 +6,8 @@ Given a window of data where the switch occurs at time t, pystan will sample the
 """
 import os
 import platform
+from re import I
+from numpy.core.fromnumeric import trace
 if platform.system()=='Darwin':
     import multiprocessing
     multiprocessing.set_start_method("fork")
@@ -29,7 +31,7 @@ if __name__ == "__main__":
     plot_bool = True
     #----------------- Parameters ---------------------------------------------------#
 
-    T = 200             # number of time steps to simulate and record measurements for
+    T = 100             # number of time steps to simulate and record measurements for
     Ts = 0.004
     cms = 100
     # true (simulation) parameters
@@ -236,8 +238,24 @@ if __name__ == "__main__":
 
     init = [init_function(0),init_function(1),init_function(2),init_function(3)]
 
-    fit = model.sampling(data=stan_data, warmup=2000, iter=3000, chains=4, init=init)
+    fit = model.sampling(data=stan_data, warmup=5000, iter=7000, chains=4, init=init)
     traces = fit.extract()
+    inv_metric = fit.get_inv_metric()
+
+    last_pos = []
+    for ii in range(4):
+        last_pos.append(dict(theta=traces['theta'][(ii+1)*1000 - 1,:],
+                             q=traces['q'][(ii+1)*1000 - 1,:],
+                             r=traces['r'][(ii+1)*1000 - 1,:]))
+
+    with open('stan_traces/last_pos_maglev.pkl','wb') as file:
+        pickle.dump(last_pos, file)
+
+    with open('stan_traces/inv_metric_maglev.pkl','wb') as file:
+        pickle.dump(inv_metric, file)
+
+    # with open('stan_traces/that_inv_metric.pkl','wb') as file:
+    #     pickle.dump(inv_metric_dict, file)
 
     # state samples
     z_samps = np.transpose(traces['h'],(1,0,2)) # Ns, Nx, T --> Nx, Ns, T
