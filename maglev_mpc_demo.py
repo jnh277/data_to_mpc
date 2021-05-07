@@ -65,7 +65,7 @@ input_constraints = (lambda u: input_upper_bound-u, lambda u: u + input_lower_bo
 
 # simulation parameters
 # WARNING DONT MAKE T > 100 due to size of saved inv_metric
-T = 2             # number of time steps to simulate and record measurements for
+T = 50             # number of time steps to simulate and record measurements for
 Ts = 0.004 # 250Hz ... 
 z1_0 = 9.0 # cm
 z2_0 = 0.0 # cm/s
@@ -258,7 +258,7 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
     control = {"adapt_delta": 0.85,
                "max_treedepth": 13,
             #    "stepsize": stepsize,
-               "inv_metric": this_inv_metric,
+            #    "inv_metric": this_inv_metric,
                "adapt_engaged": True}
 
     with suppress_stdout_stderr():
@@ -308,12 +308,12 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
         gamma = 0.2
         result = solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta_mpc, w_mpc, z_star, sqc,
                                          src,
-                                         delta, simulate, state_constraints, input_constraints, verbose=2,
+                                         delta, simulate, state_constraints, input_constraints, verbose=False,
                                          max_iter=max_iter,mu=mu,gamma=gamma)
     else:
         result = solve_chance_logbarrier(0.01*np.ones((1, Nh)), cost, gradient, hessian, ut, xt, theta_mpc, w_mpc, z_star, sqc,
                                          src,
-                                         delta, simulate, state_constraints, input_constraints, verbose=2,
+                                         delta, simulate, state_constraints, input_constraints, verbose=False,
                                          max_iter=max_iter)
     mpc_result_save.append(result)
 
