@@ -113,7 +113,7 @@ if __name__ == "__main__":
 
     # noise is predrawn and independant
     w_sim = np.zeros((Nu,1,T),dtype=float) # noise drawn for nu
-    w_sim[0,0,:] = np.random.standard_t(10, T)  * q1_true
+    w_sim[0,0,:] = np.random.randn(1, T)  * q1_true
 
     # draw measurement noise
     v = np.zeros((Ny,T+1), dtype=float)
@@ -184,13 +184,13 @@ if __name__ == "__main__":
         'u':u[0,:],
         'g':grav,
         'z0_mu': np.array([z1_0,z2_0]),
-        'z0_std': np.array([0.2,0.002]),
+        'z0_std': np.array([0.1,0.00002]),
         'theta_p_mu': np.array([I0_true, k0_true]),
-        'theta_p_std':0.1*np.array([I0_true, k0_true]),
+        'theta_p_std':0.03*np.array([I0_true, k0_true]),
         'r_p_mu': np.array([r1_true]),
-        'r_p_std': np.array([0.1*r1_true]),
+        'r_p_std': np.array([0.03*r1_true]),
         'q_p_mu': np.array([q1_true]),
-        'q_p_std': np.array([0.1*q1_true]),
+        'q_p_std': np.array([0.03*q1_true]),
         'Ts':Ts
     }
 
@@ -230,14 +230,14 @@ if __name__ == "__main__":
     def init_function(ind):
         output = dict(theta=theta_init,
                       init=h_init[:,[0]],   
-                      # q=last_pos[ind]['q'],
-                      # r=last_pos[ind]['r']
+                      q=np.array([q1_true]),
+                      r=np.array([r1_true])
                       )
         return output
 
-    # init = [init_function(0),init_function(1),init_function(2),init_function(3)]
+    init = [init_function(0),init_function(1),init_function(2),init_function(3)]
 
-    fit = model.sampling(data=stan_data, warmup=5000, iter=7000, chains=1, init=[init_function(0)])
+    fit = model.sampling(data=stan_data, warmup=5000, iter=7000, chains=4, init=init)
     traces = fit.extract()
     # inv_metric = fit.get_inv_metric()
 

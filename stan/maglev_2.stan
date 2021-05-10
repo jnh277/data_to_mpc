@@ -45,42 +45,28 @@ data {
     vector[1] q_p_std;                  // process noise prior std
 }
 parameters {
-    // matrix[2,no_obs+1] h;                     // hidden states
     row_vector[no_obs] w;                       // noise realisation
     matrix[2,1] init;
-    vector<lower=0.0>[2] theta;             // the parameters  [I0, k0]
-    vector<lower=1e-8>[1] r;                 // iid measurement noise student's t scale parameter
-    // vector<lower=1.0>[1] df_r;                // df parameter
-    vector<lower=1e-8>[1] q;                 // iid input noise injection scale parameter
+    vector<lower=1e-8>[2] theta;             // the parameters  [I0, k0]
+    vector<lower=1e-8>[1] r;                // iid measurement noise student's t scale parameter
+    // vector<lower=1.0>[1] df_r;           // df parameter
+    vector<lower=1e-8>[1] q;                // iid input noise injection scale parameter
     // vector<lower=1.0>[1] df_q;                // df parameter
 }
 transformed parameters {
     matrix[2, no_obs+1] mu;
-    row_vector[1] inter_u;
-
     mu[:,1:1] = init;
-    mu[:,2:no_obs+1] = rk4_update(mu[:,1:no_obs], u[1:no_obs] + w[1:no_obs], theta, g, Ts);
+    for (kk in 1:no_obs)
+        mu[:,kk+1:kk+1] = rk4_update(mu[:,kk:kk], u[kk:kk] + w[kk:kk], theta, g, Ts);
 }
 model {
     // df_r ~ gamma(2, 0.1); // according to https://jrnold.github.io/bayesian_notes/robust-regression.html
     // df_q ~ gamma(2, 0.1); // according to https://jrnold.github.io/bayesian_notes/robust-regression.html
     r ~ normal(r_p_mu, r_p_std);
     q ~ normal(q_p_mu, q_p_std);
-
-    w[1:no_obs] ~ student_t(10.0,0,q[1]);
-
-    // parameter priors
+    w[1:no_obs] ~ normal(0,q[1]);
     theta ~ normal(theta_p_mu, theta_p_std);
-    // init ~ normal(z0_mu,z0_std);
-    // initial state prior (Not using this / not needed)
-
-    // independent process likelihoods
-    // h[1,2:no_obs+1] = mu[1,:];
-    // h[2,2:no_obs+1] = mu[2,:];
-
-    // independent measurement likelihoods
-    // y[1:1] ~ student_t(3.0,init[1,1:1],r[1]);
-    y[1:no_obs] ~ student_t(3.0,mu[1,1:no_obs], r[1]);
+    y[1:no_obs] ~ student_t(3.0,mu[1,1:no_obs],r[1]);
 }
 
 
