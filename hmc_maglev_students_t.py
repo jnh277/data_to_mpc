@@ -117,7 +117,7 @@ if __name__ == "__main__":
 
     # draw measurement noise
     v = np.zeros((Ny,T+1), dtype=float)
-    v[0,:] = np.random.standard_t(3, T+1) * r1_true
+    v[0,:] = np.random.standard_t(5, T+1) * r1_true
 
     # simulated measurements 
     y = np.zeros((Ny,T+1), dtype=float)
@@ -184,13 +184,13 @@ if __name__ == "__main__":
         'u':u[0,:],
         'g':grav,
         'z0_mu': np.array([z1_0,z2_0]),
-        'z0_std': np.array([0.1,0.00002]),
+        'z0_std': np.array([0.03,0.002]),
         'theta_p_mu': np.array([I0_true, k0_true]),
-        'theta_p_std':0.03*np.array([I0_true, k0_true]),
+        'theta_p_std':0.2*np.array([I0_true, k0_true]),
         'r_p_mu': np.array([r1_true]),
-        'r_p_std': np.array([0.03*r1_true]),
+        'r_p_std': np.array([r1_true]),
         'q_p_mu': np.array([q1_true]),
-        'q_p_std': np.array([0.03*q1_true]),
+        'q_p_std': np.array([q1_true]),
         'Ts':Ts
     }
 
@@ -229,7 +229,7 @@ if __name__ == "__main__":
 
     def init_function(ind):
         output = dict(theta=theta_init,
-                      init=h_init[:,[0]],   
+                      init=np.array([[z1_0],[z2_0]]),   
                       q=np.array([q1_true]),
                       r=np.array([r1_true])
                       )
@@ -278,6 +278,10 @@ if __name__ == "__main__":
     # plot_trace_grid(q1plt,1,5,4,'q2',true_val=q2_true)
     plot_trace_grid(r1plt,1,4,4,'r1',true_val=r1_true)
     plt.show()
+
+    plt.plot(mu_samps[0,:,:].transpose())
+    plt.show()
+
 
     # # plot some of the initial marginal state estimates
     # for i in range(4):
