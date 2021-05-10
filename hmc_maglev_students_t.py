@@ -257,9 +257,9 @@ if __name__ == "__main__":
     #     pickle.dump(inv_metric_dict, file)
 
     # state samples
-    w_samps = np.transpose(traces['w'],(1,0,2)) # Ns, Nx, T --> Nx, Ns, T
+    mu_samps = np.transpose(traces['mu'],(1,0,2)) # Ns, Nx, T --> Nx, Ns, T
     theta_samps = traces['theta']
-
+# w_samps
     # parameter samples
     I0_samps = theta_samps[:, 0].squeeze()
     k0_samps = theta_samps[:, 1].squeeze()
