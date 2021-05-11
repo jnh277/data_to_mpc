@@ -56,19 +56,20 @@ src = np.array([[0.01]])             # square root cost on control action
 delta = 0.05                        # desired maximum probability of not satisfying the constraint
 
 x_ub = 1.2
-u_ub = 2.
-state_constraints = (lambda x: x_ub - x,)
-input_constraints = (lambda u: u_ub - u,)
+u_ub = np.pi/2
+state_constraints = (lambda x: x_ub - x,lambda x: x)
+input_constraints = (lambda u: u_ub - u,lambda u:u+u_ub)
 
 
 # simulation parameters
 T = 30              # number of time steps to simulate and record measurements for
 x0 = 0.5            # initial time step
 r_true = 0.01       # measurement noise standard deviation
-q_true = 0.05       # process noise standard deviation
+q_true = 0.1       # process noise standard deviation
+nu_true = 3.        # student t degrees of freedom
 
 #----------------- Simulate the system-------------------------------------------#
-def ssm(x, u, a=0.9, b=0.25):
+def ssm(x, u, a=0.9, b=0.2):
     return a*x + b*np.sin(u)
 
 x = np.zeros(T+1)
@@ -122,120 +123,71 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
     # apply u_t
     # this takes x_t to x_{t+1}
     # measure y_t
-    x[t+1] = ssm(x[t], u[t]) + q_true * np.random.randn()
-    # x[t + 1] = ssm(x[t], u[t]) + np.random.uniform(-0.05,0.05)
-    # x[t + 1] = ssm(x[t], u[t]) + np.random.lognormal(-3, 0.25)
-    y[t] = x[t] + r_true * np.random.randn()
+    x[t+1] = ssm(x[t], u[t]) + x[t]*q_true * np.random.randn()
+    y[t] = x[t] + r_true * np.random.standard_t(nu_true,1)
 
     # estimate system (estimates up to x_t)
-    # stan_data = {
-    #     'N': t+1,
-    #     'y': y[:t+1],
-    #     'u': u[:t+1],
-    #     'prior_mu': np.array([0.8, 0.05, 0.1, 0.1]),
-    #     'prior_std': np.array([0.2, 0.2, 0.2, 0.2]),
-    #     'prior_state_mu': 0.3,
-    #     'prior_state_std': 0.2,
-    # }
-    # with suppress_stdout_stderr():
-    #     fit = model.sampling(data=stan_data, warmup=warmup, iter=iter, chains=chains)
-    # traces = fit.extract()
+    stan_data = {
+        'N': t + 1,
+        'y': y[:t + 1],
+        'u': u[:t + 1],
+        'prior_mu': np.array([0.8, 0.05, 0.1, 0.1]),
+        'prior_std': np.array([0.2, 0.2, 0.2, 0.2]),
+        'prior_state_mu': 0.3,
+        'prior_state_std': 0.2,
+        'nu': nu_true,
+    }
+    with suppress_stdout_stderr():
+        fit = model.sampling(data=stan_data, warmup=warmup, iter=iter, chains=chains)
+    traces = fit.extract()
     #
     # # state samples
-    # z = traces['z']
+    z = traces['z']
     #
-    # # parameter samples
-    # a = traces['a']
-    # b = traces['b']
-    # r = traces['r']
-    # q = traces['q']
-    #
-    # # current state samples (expanded to [o,M]
-    # xt = np.expand_dims(z[:, -1], 0)  # inferred state for current time step
-    # # we also need to sample noise
-    # w = np.expand_dims(col_vec(q) * np.random.randn(M, N + 1), 0)  # uses the sampled stds, need to sample for x_t to x_{t+N+1}
-    # ut = np.expand_dims(np.array([u[t]]), 0)  # control action that was just applied
-    # theta = {'a': a,
-    #          'b': b, }
+    # parameter samples
+    a = traces['a']
+    b = traces['b']
+    r = traces['r']
+    q = traces['q']
 
-    # # save some things for later plotting
-    # xt_est_save[0,:,t] = z[:, -1]
-    # a_est_save[:, t] = a
-    # b_est_save[:, t] = b
-    # q_est_save[:, t] = q
-    # r_est_save[:, t] = r
-    #
-    # # calculate next control action
-    # result = solve_chance_logbarrier(np.zeros((1, N)), cost, gradient, hessian, ut, xt, theta, w, x_star, sqc, src,
-    #                                  delta, simulate, state_constraints, input_constraints, verbose=False)
-    #
-    # mpc_result_save.append(result)
-    # uc = result['uc']
-    # u[t+1] = uc[0,0]
-    u[t+1] = np.random.uniform(0,1.0)
+    # current state samples (expanded to [o,M]
+    xt = np.expand_dims(z[:, -1], 0)  # inferred state for current time step
+    # we also need to sample noise
+    w = np.expand_dims(col_vec(q) * np.random.randn(M, N + 1), 0)  # uses the sampled stds, need to sample for x_t to x_{t+N+1}
+    ut = np.expand_dims(np.array([u[t]]), 0)  # control action that was just applied
+    theta = {'a': a,
+             'b': b, }
 
+    # save some things for later plotting
+    xt_est_save[0,:,t] = z[:, -1]
+    a_est_save[:, t] = a
+    b_est_save[:, t] = b
+    q_est_save[:, t] = q
+    r_est_save[:, t] = r
+
+    # calculate next control action
+    result = solve_chance_logbarrier(np.zeros((1, N)), cost, gradient, hessian, ut, xt, theta, w, x_star, sqc, src,
+                                     delta, simulate, state_constraints, input_constraints, verbose=False)
+
+    mpc_result_save.append(result)
+    uc = result['uc']
+    u[t+1] = uc[0,0]
 
 
-# estimate system (estimates up to x_t)
-stan_data = {
-    'N': t+1,
-    'y': y[:t+1],
-    'u': u[:t+1],
-    'prior_mu': np.array([0.8, 0.05, 0.1, 0.1]),
-    'prior_std': np.array([0.2, 0.2, 0.2, 0.2]),
-    'prior_state_mu': 0.3,
-    'prior_state_std': 0.2,
-}
-# with suppress_stdout_stderr():
-fit = model.sampling(data=stan_data, warmup=warmup, iter=iter, chains=chains)
-traces = fit.extract()
-
-a = traces['a']
-b = traces['b']
-q = traces['q']
-r = traces['r']
-
-
-plt.plot(x)
-plt.show()
-
-plt.subplot(2,2,1)
-plt.hist(a)
-plt.axvline(0.9, linestyle='--',color='k')
-
-plt.subplot(2,2,2)
-plt.hist(b)
-plt.axvline(0.25, linestyle='--',color='k')
-
-plt.subplot(2,2,3)
-plt.hist(q)
-plt.axvline(q_true, linestyle='--',color='k')
-
-plt.subplot(2,2,4)
-plt.hist(r)
-plt.axvline(r_true, linestyle='--',color='k')
-
-plt.show()
-
-# e = np.random.lognormal(-3,0.25,(1000,))
-# plt.hist(e)
-# plt.show()
-
-
-# run = 'single_state_demo_results'
-# with open('results/'+run+'/xt_est_save.pkl','wb') as file:
-#     pickle.dump(xt_est_save, file)
-# with open('results/'+run+'/a_est_save.pkl','wb') as file:
-#     pickle.dump(a_est_save, file)
-# with open('results/'+run+'/b_est_save.pkl','wb') as file:
-#     pickle.dump(b_est_save, file)
-# with open('results/'+run+'/q_est_save.pkl','wb') as file:
-#     pickle.dump(q_est_save, file)
-# with open('results/'+run+'/r_est_save.pkl','wb') as file:
-#     pickle.dump(r_est_save, file)
-# with open('results/'+run+'/u.pkl','wb') as file:
-#     pickle.dump(u, file)
-# with open('results/'+run+'/x.pkl','wb') as file:
-#     pickle.dump(x, file)
-# with open('results/'+run+'/mpc_result_save.pkl', 'wb') as file:
-#     pickle.dump(mpc_result_save, file)
+run = 'test'
+with open('results/'+run+'/xt_est_save.pkl','wb') as file:
+    pickle.dump(xt_est_save, file)
+with open('results/'+run+'/a_est_save.pkl','wb') as file:
+    pickle.dump(a_est_save, file)
+with open('results/'+run+'/b_est_save.pkl','wb') as file:
+    pickle.dump(b_est_save, file)
+with open('results/'+run+'/q_est_save.pkl','wb') as file:
+    pickle.dump(q_est_save, file)
+with open('results/'+run+'/r_est_save.pkl','wb') as file:
+    pickle.dump(r_est_save, file)
+with open('results/'+run+'/u.pkl','wb') as file:
+    pickle.dump(u, file)
+with open('results/'+run+'/x.pkl','wb') as file:
+    pickle.dump(x, file)
+with open('results/'+run+'/mpc_result_save.pkl', 'wb') as file:
+    pickle.dump(mpc_result_save, file)

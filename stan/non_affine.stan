@@ -6,24 +6,16 @@ data {
     vector[4] prior_std;    // prior stds of parameters
     real prior_state_mu;    // first timestep state prior mean
     real prior_state_std;   // first timestep state prior std
+    real <lower=0.1> nu;    // student t degrees of freedom
 }
 parameters {
     real<lower=-1.0,upper=1.0> a;       // state parameter
     real<lower=0.0> r;                  // measurement noise std
     real<lower=0.0> q;                  // process noise std
     real b;
-//    real z0;
-    vector[N] z;
+    vector<lower=1e-8>[N] z;
 }
-//transformed parameters {
-//    vector[N] z;
-//    z[1] = z0;
-//    for (n in 2:N) {
-//        z[n] = a*z[n-1] + b * sin(u[n-1]) + e[n-1];
-//    }
-//
-//
-//}
+
 
 model {
     // noise stds priors
@@ -37,10 +29,9 @@ model {
     // initial state prior
     z[1] ~ normal(0,5);
     // state likelihood
-//    e ~ lognormal(-3, q);
-    z[2:N] ~ uniform(a*z[1:N-1] + b * sin(u[1:N-1])-q, a*z[1:N-1] + b * sin(u[1:N-1])+q);
+    z[2:N] ~ normal(a*z[1:N-1] + b * sin(u[1:N-1]), z[1:N-1]*q);
 
     // measurement likelihood
-    y ~ normal(z, r);
+    y ~ student_t(nu ,z, r);
 
 }
