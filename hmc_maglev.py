@@ -29,7 +29,7 @@ if __name__ == "__main__":
     plot_bool = True
     #----------------- Parameters ---------------------------------------------------#
 
-    T = 200             # number of time steps to simulate and record measurements for
+    T = 300             # number of time steps to simulate and record measurements for
     Ts = 0.004
     cms = 100
     # true (simulation) parameters
@@ -39,8 +39,8 @@ if __name__ == "__main__":
     r1_true = 0.005 # cm stdev
     # q1_true = cms*0.0005 * Ts # process noise standard deviation
     # q2_true = cms*0.00005 * Ts
-    q1_true = 0.1 * Ts
-    q2_true = 0.01 * Ts
+    q1_true = 0.01
+    q2_true = 0.01
     # q2_true = 0.1
 
     # got these values from the data sheet
