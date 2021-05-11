@@ -30,6 +30,6 @@ model {
     z[2:N] ~ normal(a*z[1:N-1] + b * u[1:N-1], q);
 
     // measurement likelihood
-    y ~ normal(z, r);
-
+//    y ~ normal(z, r);
+    y ~ student_t(3, z, r);
 }

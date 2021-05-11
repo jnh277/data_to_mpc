@@ -98,13 +98,13 @@ def log_barrier_cost(z, ut, xt, x_star, theta, w, sqc, src, delta, mu, gamma, si
     x = simulate(xt, u, w, theta)
     # state error and input penalty cost and cost that drives slack variables down
     # potentially np.reshape(x_star,(o,1,-1))??
-    V1 = jnp.sum((sqc[1, 1] * (x[1, :, 1:] - x_star[1, 0]))**2) + \
-         jnp.sum((sqc[0, 0] * (x[0, :, 1:] - x_star[0, 0])) ** 2) + \
-         jnp.sum(jnp.matmul(src, uc) ** 2) + jnp.sum(2000 * (epsilon + 1e3) ** 2)
+    # V1 = jnp.sum((sqc[1, 1] * (x[1, :, 1:] - x_star[1, 0]))**2) + \
+    #      jnp.sum((sqc[0, 0] * (x[0, :, 1:] - x_star[0, 0])) ** 2) + \
+    #      jnp.sum(jnp.matmul(src, uc) ** 2) + jnp.sum(2000 * (epsilon + 1e3) ** 2)
         #  jnp.sum((sqc[2, 2] * (x[2, :, 1:] - x_star[2, 0])) ** 2) + \
         #  jnp.sum((sqc[3, 3] * (x[3, :, 1:] - x_star[3, 0])) ** 2) + \
 
-    # V1 = jnp.sum(jnp.matmul(sqc,jnp.reshape(x[:,:,1:] - jnp.reshape(x_star,(o,1,-1)),(o,-1))) ** 2) + jnp.sum(jnp.matmul(src, uc)**2) + jnp.sum(300 * (epsilon + 1e3)**2)
+    V1 = jnp.sum(jnp.matmul(sqc,jnp.reshape(x[:,:,1:] - jnp.reshape(x_star,(o,1,-1)),(o,-1))) ** 2) + jnp.sum(jnp.matmul(src, uc)**2) + jnp.sum(300 * (epsilon + 1e3)**2)
     # need a log barrier on each of the slack variables to ensure they are positve
     V2 = logbarrier(epsilon - delta, mu)     # aiming for 1-delta% accuracy
     # now the chance constraints

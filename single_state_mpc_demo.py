@@ -116,7 +116,7 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
     # this takes x_t to x_{t+1}
     # measure y_t
     x[t+1] = ssm(x[t], u[t]) + q_true * np.random.randn()
-    y[t] = x[t] + r_true * np.random.randn()
+    y[t] = x[t] + r_true * np.random.standard_t(4, 1)
 
     # estimate system (estimates up to x_t)
     stan_data = {
@@ -165,7 +165,7 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
     u[t+1] = uc[0,0]
 
 
-run = 'single_state_demo_results'
+run = 'test'
 with open('results/'+run+'/xt_est_save.pkl','wb') as file:
     pickle.dump(xt_est_save, file)
 with open('results/'+run+'/a_est_save.pkl','wb') as file:
