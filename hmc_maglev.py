@@ -116,7 +116,8 @@ if __name__ == "__main__":
 
     # draw measurement noise
     v = np.zeros((Ny,T+1), dtype=float)
-    v[0,:] = np.random.normal(0.0, r1_true, T+1)
+    # v[0,:] = np.random.normal(0.0, r1_true, T+1)
+    v[0,:] = np.random.standard_t(5, T + 1) * r1_true
 
     # simulated measurements 
     y = np.zeros((Ny,T+1), dtype=float)
@@ -167,7 +168,7 @@ if __name__ == "__main__":
     #----------- USE HMC TO PERFORM INFERENCE ---------------------------#
     # avoid recompiling
     script_path = os.path.dirname(os.path.realpath(__file__))
-    model_name = 'maglev'
+    model_name = 'maglev2'
     path = '/stan/'
     if Path(script_path+path+model_name+'.pkl').is_file():
         model = pickle.load(open(script_path+path+model_name+'.pkl', 'rb'))
@@ -275,7 +276,9 @@ if __name__ == "__main__":
     # plt.show()
 
 
-
+    plt.plot(z_samps[0,:,:].mean(axis=0))
+    plt.plot(z_sim[0,0,:])
+    plt.show()
 
 
 
