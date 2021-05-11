@@ -11,7 +11,7 @@ parameters {
     real<lower=-1.0,upper=1.0> a;       // state parameter
     real<lower=0.0> r;                  // measurement noise std
     real<lower=0.0> q;                  // process noise std
-    real b;
+    real<lower=0.0> b;
     vector[N] z;
 }
 model {
@@ -27,9 +27,9 @@ model {
     z[1] ~ normal(prior_state_mu,prior_state_std);
 
     // state likelihood
-    z[2:N] ~ normal(a*z[1:N-1] + b * u[1:N-1], q);
+    z[2:N] ~ normal(a*z[1:N-1] + (b + 0.05 * z[1:N-1]) .* u[1:N-1], q);
 
     // measurement likelihood
 //    y ~ normal(z, r);
-    y ~ student_t(3, z, r);
+    y ~ student_t(5, z, r);
 }

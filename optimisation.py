@@ -266,8 +266,8 @@ def solve_chance_logbarrier(uc0, cost, gradient, hessian, ut, xt, theta, w, x_st
                 status = 0
                 break  # termination criteria satisfied
 
-            mu = max(mu / 2, 0.999e-6)
-            gamma = max(gamma / 1.25, 0.999e-3)
+            mu = max(mu / 1.5, 0.999e-6)
+            gamma = max(gamma / 1.25*3/4, 0.999e-3)
             # need to adjust the slack after changing gamma
             if ncx > 0:
                 x_new = simulate(xt, np.hstack([ut, row_vec(z[:Nu*N])]), w, theta)
