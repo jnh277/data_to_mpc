@@ -167,7 +167,9 @@ theta_true = fill_theta(theta_true)
 
 
 ## load results
-run = 'rotary_inverted_pendulum_demo_results'
+# run = 'rotary_inverted_pendulum_demo_results'
+run = 'pend_mismatch_test5'
+# run = 'pend_mismatch_test_floatingpoint'
 with open('results/'+run+'/xt_est_save100.pkl','rb') as file:
     xt_est_save = pickle.load(file)
 with open('results/'+run+'/theta_est_save100.pkl','rb') as file:
@@ -188,8 +190,8 @@ with open('results/'+run+'/uc_save100.pkl', 'rb') as file:
 ## Plot results
 plotme1 = True
 if plotme1:
-    ts = np.arange(50)*0.025
-    tsx = np.arange(51)*0.025
+    ts = np.arange(z_sim.shape[2]-1)*0.025
+    tsx = np.arange(z_sim.shape[2])*0.025
     plt.plot(u[0,:])
     plt.title('MPC determined control action')
     plt.axhline(input_bound, linestyle='--', color='r', linewidth=2, label='constraint')
@@ -199,13 +201,15 @@ if plotme1:
     plt.show()
 
     ## ! PLOT ANGLES AND CONTROL
-    fig = plt.figure(figsize=(6.4,7.2),dpi=300)
+    fig = plt.figure(figsize=(6.4,5),dpi=300)
     plt.subplot(3, 2, 1)
     plt.plot(ts,xt_est_save[:,0,:].mean(axis=0), color=u'#1f77b4',linewidth = 1,label='True')
     plt.axhline(state_bound, linestyle='--', color='r', linewidth=1.0, label='Constraints')
     plt.axhline(-state_bound, linestyle='--', color='r', linewidth=1.0)
     plt.xlim([0,49*0.025])
-    plt.ylabel('Base arm angle (rad)')
+    # plt.ylabel('Base arm angle (rad)')
+    plt.ylabel('Arm angle (rad)')
+    # plt.ylabel(r'$\vartheta$ (rad)')
 
     plt.subplot(3, 2, 2)
     err = xt_est_save[:,0,:]-z_sim[0,0,:-1]
@@ -213,14 +217,14 @@ if plotme1:
     plt.fill_between(ts,np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15,label='95% interval')
     plt.ticklabel_format(style='sci',axis='y',scilimits=(0,0))
     plt.xlim([0,49*0.025])
-    plt.ylabel('Base arm err. distr. (rad)')
+    plt.ylabel('Arm err. distr. (rad)')
 
 
     plt.subplot(3, 2, 3)
     plt.plot(ts,xt_est_save[:,1,:].mean(axis=0), color=u'#1f77b4',linewidth = 1)
     plt.axhline(-z_star[1,0], linestyle='--', color='g', linewidth=1.0, label='Target')
     plt.xlim([0,49*0.025])
-    plt.ylabel('Pendulum angle (rad)')
+    plt.ylabel('Pend. angle (rad)')
 
     plt.subplot(3, 2, 4)
     err = xt_est_save[:,1,:]-z_sim[1,0,:-1]
@@ -228,7 +232,7 @@ if plotme1:
     plt.fill_between(ts,np.percentile(err,97.5,axis=0),np.percentile(err,2.5,axis=0),color=u'#1f77b4',alpha=0.15)
     plt.xlim([0,49*0.025])
     plt.ticklabel_format(style='sci',axis='y',scilimits=(0,0))
-    plt.ylabel('Pendulum err. distr. (rad)')
+    plt.ylabel('Pend. err. distr. (rad)')
 
 
     plt.subplot(3, 2, 5)
@@ -248,7 +252,7 @@ if plotme1:
     plt.plot(ts,kin_pend + pot, color=u'#1f77b4',linewidth = 1)
     plt.ticklabel_format(style='sci',axis='y',scilimits=(0,0))
     plt.xlim([0,49*0.025])
-    plt.ylabel('Total pendulum energy (J)')
+    plt.ylabel('Total energy (J)')
     plt.xlabel('Time (s)')
 
 
@@ -521,7 +525,7 @@ if plotme1:
     plt.plot(ts,theta_est_save[:,ind,:].mean(axis=0),color=u'#1f77b4',label='Sample mean',linewidth=1)
     plt.ticklabel_format(style='sci',axis='y',scilimits=(0,0))
     plt.xlim([0,25*0.025])
-    plt.ylabel(r'$D_r$ ($Nms/rad$)')
+    plt.ylabel(r'$D_{r1}$ ($Nms/rad$)')
     plt.xlabel('Time (s)')
     plt.subplot(3, 2, 6)
     ind = 4
@@ -535,8 +539,8 @@ if plotme1:
 
     plt.tight_layout(rect=[0,0.07,1,1])
     plt.figlegend(('True value','Sample mean','95% CI'),loc='upper center',bbox_to_anchor=[0.5, 0.1], ncol=3)
-    # plt.savefig('stills/'+run+'_subplot_params_six.png',format='png')
-    # plt.close()
-    plt.show()
+    plt.savefig('stills/'+run+'_subplot_params_six.png',format='png')
+    plt.close()
+    # plt.show()
 
 
