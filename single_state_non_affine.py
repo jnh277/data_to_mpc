@@ -46,6 +46,10 @@ from optimisation import log_barrier_cost, solve_chance_logbarrier
 
 config.update("jax_enable_x64", True)           # run jax in 64 bit mode for accuracy
 
+# set seed for reproducibility
+# np.random.seed(seed=1020)
+# np.random.seed(seed=733)
+np.random.seed(seed=316)
 
 # Control parameters
 x_star = np.array([1.0])        # desired set point
@@ -64,9 +68,9 @@ input_constraints = (lambda u: u_ub - u,lambda u:u+u_ub)
 # simulation parameters
 T = 30              # number of time steps to simulate and record measurements for
 x0 = 0.5            # initial time step
-r_true = 0.01       # measurement noise standard deviation
-q_true = 0.1       # process noise standard deviation
-nu_true = 3.        # student t degrees of freedom
+r_true = 0.05       # measurement noise standard deviation
+q_true = 0.05       # process noise standard deviation
+nu_true = 4.        # student t degrees of freedom
 
 #----------------- Simulate the system-------------------------------------------#
 def ssm(x, u, a=0.9, b=0.2):
@@ -123,7 +127,7 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
     # apply u_t
     # this takes x_t to x_{t+1}
     # measure y_t
-    x[t+1] = ssm(x[t], u[t]) + x[t]*q_true * np.random.randn()
+    x[t+1] = ssm(x[t], u[t]) + q_true * np.random.randn()
     y[t] = x[t] + r_true * np.random.standard_t(nu_true,1)
 
     # estimate system (estimates up to x_t)
@@ -137,8 +141,15 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
         'prior_state_std': 0.2,
         'nu': nu_true,
     }
+
+    def init_function(ind):
+        output = dict(z = y[:t+1],
+                      )
+        return output
+    init = [init_function(0),init_function(1),init_function(2),init_function(3)]
+
     with suppress_stdout_stderr():
-        fit = model.sampling(data=stan_data, warmup=warmup, iter=iter, chains=chains)
+        fit = model.sampling(data=stan_data, warmup=warmup, iter=iter, chains=chains, init=init)
     traces = fit.extract()
     #
     # # state samples

@@ -55,8 +55,8 @@ input_constraints = (lambda u: u_ub - u,)
 # simulation parameters
 T = 30              # number of time steps to simulate and record measurements for
 x0 = 0.5            # initial time step
-r_true = 0.01       # measurement noise standard deviation
-q_true = 0.1       # process noise standard deviation
+r_true = 0.05       # measurement noise standard deviation
+q_true = 0.05       # process noise standard deviation
 
 #----------------- Simulate the system-------------------------------------------#
 def ssm(x, u, a=0.9, b=0.2):
@@ -76,7 +76,7 @@ def simulate(xt, u, w, theta):
 
 
 
-run = 'test'
+run = 'test2'
 with open('results/'+run+'/xt_est_save.pkl','rb') as file:
     xt_est_save = pickle.load(file)
 with open('results/'+run+'/a_est_save.pkl','rb') as file:
@@ -152,13 +152,13 @@ plt.tight_layout(rect=[0,0.03,1,1])
 # plt.close()
 plt.show()
 
-
-result = mpc_result_save[5]
-xt = np.reshape(x[5],(1,1))
-ut = np.array([[u[5]]])
-a = a_est_save[:,5]
-b = b_est_save[:,5]
-q = q_est_save[:,5]
+tt = 9
+result = mpc_result_save[tt]
+xt = np.reshape(x[tt],(1,1))
+ut = np.array([[u[tt]]])
+a = a_est_save[:,tt]
+b = b_est_save[:,tt]
+q = q_est_save[:,tt]
 w = np.expand_dims(col_vec(q) * np.random.randn(M, N+1), 0)
 theta = {'a':a,
          'b':b}
