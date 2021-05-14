@@ -50,13 +50,17 @@ Warning, if you do not have CUDA enabled JAX then this will take a long time to 
 presaved results.
 
 ### Results
+
 States and control action over simulation
+
 ![State_and_control_action](stills/order1_x_u.png) 
 
 Estimated parameters (marginal distributions shown) over simulation
+
 ![Parameter_estimates](stills/order1_params.png) 
 
 Forecast future states and optimised control action over the MPC control horizon
+
 ![MPC_control_horizon](stills/order1_MPC_horizon.png) 
 
 ## Simulation B) Rotary Inverted Pendulum
@@ -105,10 +109,16 @@ presaved results.
 ### Results
 
 True and estimated states and control action over simulation
+
 ![State_and_control_action](stills/pendulum_states_control.png) 
 
 Parameter estimates over simulation (marginal distributions shown)
+
 ![Parameter_estimates](stills/pendulum_damping_mismatch_results_subplot_params_six.png) 
+
+Simulation video
+
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/QOruyv8Dr88/0.jpg)](https://www.youtube.com/watch?v=QOruyv8Dr88)
 
 ## Additonal simulations
 An alternate version of the pedagogical example can be run using the command
