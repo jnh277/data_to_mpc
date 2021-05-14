@@ -1,4 +1,4 @@
-# data_to_mpc
+# Data to control: An approximate solution
 
 Companion code to the paper 
 
@@ -62,7 +62,30 @@ Forecast future states and optimised control action over the MPC control horizon
 ## Simulation B) Rotary Inverted Pendulum
 Demonstrates the data to controller approach on a simulated rotary inverted pendulum system with input and output
 constraints. 
-This example has a mismatch between the damping model used for simulation and the model used for estimation
+This example has a mismatch between the damping model used for simulation and the model used for estimation. 
+The continuous time dynamics are given by
+
+![equation](https://latex.codecogs.com/svg.latex?M%28%5Calpha%29%5Cbegin%7Bbmatrix%7D%5Cddot%7B%5Cvartheta%7D%20%5C%5C%20%5Cddot%7B%5Calpha%7D%20%5Cend%7Bbmatrix%7D%20&plus;%20%5Cnu%28%5Cdot%7B%5Cvartheta%7D%2C%5Cdot%7B%5Calpha%7D%29%5Cbegin%7Bbmatrix%7D%5Cdot%7B%5Cvartheta%7D%20%5C%5C%20%5Cdot%7B%5Calpha%7D%20%5Cend%7Bbmatrix%7D%20%3D%20%5Cbegin%7Bbmatrix%7D%5Cfrac%7Bk_m%28V_m%20-%20k_m%5Cdot%7B%5Cvartheta%7D%29%7D%7BR_m%7D%20-%20D_r%28%5Cdot%7B%5Cvartheta%7D%29%20%5C%5C%20-%5Cfrac%7B1%7D%7B2%7Dm_pL_pg%5Csin%28%5Calpha%29-D_p%5Cdot%7B%5Calpha%7D%20%5Cend%7Bbmatrix%7D)
+
+![equation](https://latex.codecogs.com/svg.latex?M%28%5Calpha%29%20%3D%20%5Cbegin%7Bbmatrix%7D%20m_pL_r%5E2&plus;%5Cfrac%7B1%7D%7B4%7Dm_pL_p%5E2%281-%5Ccos%28%5Calpha%29%5E2%29&plus;J_r%20%26%20%5Cfrac%7B1%7D%7B2%7Dm_pL_pL_r%5Ccos%28%5Calpha%29%20%5C%5C%20%5Cfrac%7B1%7D%7B2%7Dm_pL_pL_r%5Ccos%28%5Calpha%29%20%26%20J_p%20&plus;%20%5Cfrac%7B1%7D%7B4%7Dm_pL_p%5E2%20%5Cend%7Bbmatrix%7D)
+
+![equation](https://latex.codecogs.com/svg.latex?%5Cnu%28%5Cdot%7B%5Cvartheta%7D%2C%5Cdot%7B%5Calpha%7D%29%20%3D%20%5Cbegin%7Bbmatrix%7D%20%5Cfrac%7B1%7D%7B2%7Dm_pL_p%5E2%5Csin%28%5Calpha%29%5Ccos%28%5Calpha%29%5Cdot%7B%5Calpha%7D%20%26%20-%20%5Cfrac%7B1%7D%7B2%7Dm_pL_pL_r%5Csin%28%5Calpha%29%5Cdot%7B%5Calpha%7D%20%5C%5C%20-%20%5Cfrac%7B1%7D%7B4%7Dm_pL_p%5E2%5Ccos%28%5Calpha%29%5Csin%28%5Calpha%29%5Cdot%7B%5Cvartheta%7D%20%26%200%20%5Cend%7Bbmatrix%7D)
+
+For simulation the damping model
+
+![equation](https://latex.codecogs.com/svg.latex?D_r%28%5Cdot%5Cvartheta%29%20%3D%20D_%7Br0%7D%5Ctext%7Bsign%7D%28%5Cdot%5Cvartheta%29%20&plus;%20D_%7Br1%7D%5Cdot%5Cvartheta%20&plus;%20D_%7Br2%7D%5Cdot%5Cvartheta%5E2)
+
+was used, and for estimation and control the damping model
+
+![equation](https://latex.codecogs.com/svg.latex?D_r%28%5Cdot%5Cvartheta%29%20%3D%20D_%7Br1%7D%5Cdot%5Cvartheta)
+
+to reflect that it is unlikely to know the true damping model. This system is discretised at 25ms intervals using an RK4 and
+discrete time Gaussian process noise w_t is added. Measurements of the two angles and the supplied current are available given the 
+measurement model
+
+![equation](https://latex.codecogs.com/svg.latex?y_t%20%3D%20%5Cbegin%7Bbmatrix%7D%5Cvartheta%20%26%20%5Calpha%20%26%20%5Cfrac%7BV_m-k_m%5Cdot%7B%5Cvartheta%7D%7D%7BR_m%7D%5Cend%7Bbmatrix%7D%20&plus;%20e_t)
+
+
 A more detailed description of the simulation is given in the paper.
 
 Presaved results corresponding to the plots shown in the paper can be plotted by running 
@@ -107,11 +130,12 @@ Results can be plotted by running
 python plot_single_state_demo.py
 ```
 
-A version of the inverted pendulum example WITHOUT the mismatch in damping can be run using
+A version of the inverted pendulum example WITHOUT the mismatch in damping (linear damping model for simulation, estimation,
+and control) can be run using
 ```
 python inverted_pendulum_mpc_demo.py
 ```
-The results can be plotted by changing teh file to be loaded in the script 'plot_pendulum_results.py' setting
+The results can be plotted by changing the file to be loaded in the script 'plot_pendulum_results.py' setting
 ```
 run = 'rotary_inverted_pendulum_demo_results'
 ```
