@@ -48,8 +48,8 @@ config.update("jax_enable_x64", True)           # run jax in 64 bit mode for acc
 
 # set seed for reproducibility
 # np.random.seed(seed=1020)
-# np.random.seed(seed=733)
-np.random.seed(seed=316)
+np.random.seed(seed=733)
+# np.random.seed(seed=316)
 
 # Control parameters
 x_star = np.array([1.0])        # desired set point
@@ -120,6 +120,7 @@ b_est_save = np.zeros((M,T))
 q_est_save = np.zeros((M,T))
 r_est_save = np.zeros((M,T))
 mpc_result_save = []
+accept_rates = []
 
 ### SIMULATE SYSTEM AND PERFORM MPC CONTROL
 for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control'):
@@ -152,6 +153,10 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
         fit = model.sampling(data=stan_data, warmup=warmup, iter=iter, chains=chains, init=init)
     traces = fit.extract()
     #
+    sampler_params = fit.get_sampler_params()
+    chain_accept_rates = np.array([t['accept_stat__'].mean() for t in sampler_params])
+    accept_rates.append(chain_accept_rates)
+
     # # state samples
     z = traces['z']
     #
@@ -185,7 +190,7 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
     u[t+1] = uc[0,0]
 
 
-run = 'test'
+run = 'test2'
 with open('results/'+run+'/xt_est_save.pkl','wb') as file:
     pickle.dump(xt_est_save, file)
 with open('results/'+run+'/a_est_save.pkl','wb') as file:
@@ -202,3 +207,5 @@ with open('results/'+run+'/x.pkl','wb') as file:
     pickle.dump(x, file)
 with open('results/'+run+'/mpc_result_save.pkl', 'wb') as file:
     pickle.dump(mpc_result_save, file)
+with open('results/' + run + '/accept_rates.pkl', 'wb') as file:
+    pickle.dump(accept_rates, file)
