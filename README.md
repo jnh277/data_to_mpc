@@ -61,7 +61,7 @@ Estimated parameters (marginal distributions shown) over simulation
 
 Forecast future states and optimised control action over the MPC control horizon
 
-
+![MPC_control_horizon](stills/order1_mpc_horizon.png) 
 
 ## Simulation B) Rotary Inverted Pendulum
 Demonstrates the data to controller approach on a simulated rotary inverted pendulum system with input and output
