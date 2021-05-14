@@ -336,11 +336,14 @@ for t in tqdm(range(T), desc='Simulating system, running hmc, calculating contro
     inv_metric = pickle.load(open('stan_traces/inv_metric.pkl', 'rb'))
     this_inv_metric = inv_metric.copy()
     for cc in range(4):
-        this_inv_metric[cc] = np.hstack((inv_metric[cc][0:t + 2],
-                                         inv_metric[cc][101:101 + t + 2],
-                                         inv_metric[cc][202:202 + t + 2],
-                                         inv_metric[cc][303:303 + t + 2],
+        # this_inv_metric[cc] = np.hstack((inv_metric[cc][0:t + 2],
+        #                                  inv_metric[cc][101:101 + t + 2],
+        #                                  inv_metric[cc][202:202 + t + 2],
+        #                                  inv_metric[cc][303:303 + t + 2],
+        #                                  inv_metric[cc][-13:]))
+        this_inv_metric[cc] = np.hstack((inv_metric[cc][0:((t+2)*4)],
                                          inv_metric[cc][-13:]))
+
     if t == 0:
         z_init = np.hstack((np.array([[z1_0], [z2_0], [z3_0], [z4_0]]),
                             z_sim[:, 0, [t + 1]]))
