@@ -202,7 +202,7 @@ plt.plot(np.arange(1,N+1),uc[0,:],color='k',linewidth=2.0)
 plt.xlabel(r'$u_{t+k}$ for $k \in [1,N]$', fontsize=fontsize)
 plt.ylabel(r'u', fontsize=fontsize)
 plt.xlim([1,10])
-plt.savefig('stills/order1_mpc_horizon.png', format='png')
+# plt.savefig('stills/order1_mpc_horizon.png', format='png')
 # plt.close()
 plt.show()
 
