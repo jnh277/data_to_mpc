@@ -25,7 +25,13 @@ It also contains two additional simulation scripts.
 ## Simulation A) Pedagogical Example
 
 Demonstrates the data to controller approach on a simulated non-control affine single state system with input and output constraints,
-and student t distributed measurement noise. 
+and student t distributed measurement noise. The system is given by
+
+![equation](https://latex.codecogs.com/svg.latex?x_%7Bt&plus;1%7D%20%3D%20ax_t&plus;b%5Ccos%28u_t%29%20&plus;%20w_t)
+
+![equation](https://latex.codecogs.com/svg.latex?y_t%20%3D%20x_t%20&plus;%20e_t)
+
+where w_t has a Gaussian distribution and e_t has a Student's T distribution.
 A more detailed description of the simulation is given in the paper.
 
 Presaved results corresponding to the plots shown in the paper can be plotted by running 
@@ -87,6 +93,15 @@ An alternate version of the pedagogical example can be run using the command
 python single_state_mpc_demo.py
 ```
 This version of the pedagogical example is control affine and has Gaussian process and measurement noise. 
+ The system is given by
+
+![equation](https://latex.codecogs.com/svg.latex?x_%7Bt&plus;1%7D%20%3D%20ax_t&plus;bu_t&plus;w_t)
+
+![equation](https://latex.codecogs.com/svg.latex?y_t%20%3D%20x_t%20&plus;%20e_t)
+
+where both w_t and e_t have Gaussian distributions.
+
+
 Results can be plotted by running
 ```
 python plot_single_state_demo.py
