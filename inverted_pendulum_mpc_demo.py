@@ -17,10 +17,11 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ###############################################################################
 
-""" This script runs simulation B) Rotary inverted pendulum from the paper and saves the results """
+""" This script runs a version of the rotary inverted pendulum example WITHOUT damping mismatch
+and saves the results the results in rotary_inverted_pendulum_demo_results"""
 """ This script will take a fair amount of time to run if you have not installed cuda enabled JAX,
     presaved results are included and can be plotted without running this script """
-""" The results can then be plotted using the script 'plot_pendulum_results.py' """
+""" The results can then be plotted using the script 'plot_pendulum_results.py' after changing the file to be loaded """
 
 # general imports
 import pystan
@@ -402,3 +403,4 @@ with open('results/'+run+'/mpc_result_save100.pkl', 'wb') as file:
     pickle.dump(mpc_result_save, file)
 with open('results/'+run+'/uc_save100.pkl', 'wb') as file:
     pickle.dump(uc_save, file)
+

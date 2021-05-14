@@ -17,7 +17,8 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ###############################################################################
 
-""" This script runs simulation A) Pedagogical Example from the paper and saves the results """
+""" This script runs an alternate version of the pedagogical Example from the paper and saves the results """
+""" This example is control affine and has Gaussian measurement and process noise"""
 """ This overwrites the preincluded results that match the paper plots """
 """ The results can then be plotted using the script 'plot_single_state_demo.py' """
 
