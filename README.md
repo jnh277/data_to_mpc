@@ -73,6 +73,13 @@ python inverted_pendulum_damping_mismatch_demo.py
 Warning, if you do not have CUDA enabled JAX then this will take a very long time to run and it is recommended you plot the 
 presaved results.
 
+### Results
+
+True and estimated states and control action over simulation
+![State_and_control_action](stills/pendulum_states_control.png) 
+
+Parameter estimates over simulation (marginal distributions shown)
+![Parameter_estimates](stills/pendulum_damping_mismatch_results_subplot_params_six.png) 
 
 ## Additonal simulations
 An alternate version of the pedagogical example can be run using the command

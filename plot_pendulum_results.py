@@ -540,8 +540,8 @@ if plotme1:
 
     plt.tight_layout(rect=[0,0.07,1,1])
     plt.figlegend(('True value','Sample mean','95% CI'),loc='upper center',bbox_to_anchor=[0.5, 0.1], ncol=3)
-    plt.savefig('stills/'+run+'_subplot_params_six.png',format='png')
-    plt.close()
-    # plt.show()
+    # plt.savefig('stills/'+run+'_subplot_params_six.png',format='png')
+    # plt.close()
+    plt.show()
 
 
