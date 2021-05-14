@@ -6,7 +6,7 @@ Title: Data  to  Controller  for  Nonlinear  Systems:  An  Approximate  Solution
 
 Authors: Johannes N. Hendriks, James R. Z. Holdsworth, Adrian G. Wills, Thomas B. Schön and Brett Ninness
 
-Submitted to the 2021 Control Design Conference
+Joint submission to the 2021 Control Design Conference and The IEEE Control Systems Letters.
 
 ## Paper Abstract
 
@@ -19,23 +19,25 @@ evolve  so  that  control decisions are made accounting for uncertainty as evide
 The resulting problem is intractable which we obviate by  providing  approximations  that  result  in  finite  
 dimensional deterministic optimisation problems. The proposed approach is demonstrated  in  simulation  on  a  nonlinear  system.
  
-This git repository contains code to run the two simulations given in the paper and to plot the results.
+This git repository contains code to run the two simulations given in the paper and to plot the results. 
+It also contains two additional simulation scripts.
 
 ## Simulation A) Pedagogical Example
 
-Demonstrates the data to controller approach on a simulated single state system with input and output constraints. 
+Demonstrates the data to controller approach on a simulated non-control affine single state system with input and output constraints,
+and student t distributed measurement noise. 
 A more detailed description of the simulation is given in the paper.
 
 Presaved results corresponding to the plots shown in the paper can be plotted by running 
 
 ```
-python plot_single_state_demo.py
+python plot_non_affine.py
 ```
 
 Alternatively, a new simulation can be run (will then overwrite these results) using
 
 ```
-python single_state_mpc_demo.py
+python single_state_non_affine.py
 ```
 
 Warning, if you do not have CUDA enabled JAX then this will take a long time to run and it is recommended you plot the 
@@ -43,7 +45,9 @@ presaved results.
 
 ## Simulation B) Rotary Inverted Pendulum
 Demonstrates the data to controller approach on a simulated rotary inverted pendulum system with input and output
-constraints. A more detailed description of the simulation is given in the paper.
+constraints. 
+This example has a mismatch between the damping model used for simulation and the model used for estimation
+A more detailed description of the simulation is given in the paper.
 
 Presaved results corresponding to the plots shown in the paper can be plotted by running 
 
@@ -54,10 +58,35 @@ python plot_pendulum_results.py
 Alternatively, a new simulation can be run (will then overwrite these results) using
 
 ```
-python inverted_pendulum_mpc_demo.py
+python inverted_pendulum_damping_mismatch_demo.py
 ```
 Warning, if you do not have CUDA enabled JAX then this will take a very long time to run and it is recommended you plot the 
 presaved results.
+
+
+## Additonal simulations
+An alternate version of the pedagogical example can be run using the command
+```
+python single_state_mpc_demo.py
+```
+This version of the pedagogical example is control affine and has Gaussian process and measurement noise. 
+Results can be plotted by running
+```
+python plot_single_state_demo.py
+```
+
+A version of the inverted pendulum example WITHOUT the mismatch in damping can be run using
+```
+python inverted_pendulum_mpc_demo.py
+```
+The results can be plotted by changing teh file to be loaded in the script 'plot_pendulum_results.py' setting
+```
+run = 'rotary_inverted_pendulum_demo_results'
+```
+ and then running the command
+```
+python plot_pendulum_results.py
+```
 
 ## Requirements
 
