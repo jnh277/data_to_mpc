@@ -43,6 +43,16 @@ python single_state_non_affine.py
 Warning, if you do not have CUDA enabled JAX then this will take a long time to run and it is recommended you plot the 
 presaved results.
 
+### Results
+States and control action over simulation
+![State_and_control_action](stills/order1_x_u.png) 
+
+Estimated parameters (marginal distributions shown) over simulation
+![Parameter_estimates](stills/order1_params.png) 
+
+Forecast future states and optimised control action over the MPC control horizon
+![MPC_control_horizon](stills/order1_MPC_horizon.png) 
+
 ## Simulation B) Rotary Inverted Pendulum
 Demonstrates the data to controller approach on a simulated rotary inverted pendulum system with input and output
 constraints. 
