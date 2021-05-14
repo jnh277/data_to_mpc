@@ -18,8 +18,9 @@
 ###############################################################################
 
 """ This script runs simulation A) Pedagogical Example from the paper and saves the results """
+""" This example is non-control affine and has student t distributed measurement noise"""
 """ This overwrites the preincluded results that match the paper plots """
-""" The results can then be plotted using the script 'plot_single_state_demo.py' """
+""" The results can then be plotted using the script 'plot_non_affine.py' """
 
 import platform
 if platform.system()=='Darwin':
@@ -190,7 +191,7 @@ for t in tqdm(range(T),desc='Simulating system, running hmc, calculating control
     u[t+1] = uc[0,0]
 
 
-run = 'test2'
+run = 'non_affine_results'
 with open('results/'+run+'/xt_est_save.pkl','wb') as file:
     pickle.dump(xt_est_save, file)
 with open('results/'+run+'/a_est_save.pkl','wb') as file:

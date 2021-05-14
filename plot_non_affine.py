@@ -76,7 +76,7 @@ def simulate(xt, u, w, theta):
 
 
 
-run = 'test2'
+run = 'non_affine_results'
 with open('results/'+run+'/xt_est_save.pkl','rb') as file:
     xt_est_save = pickle.load(file)
 with open('results/'+run+'/a_est_save.pkl','rb') as file:
@@ -93,9 +93,12 @@ with open('results/'+run+'/u.pkl','rb') as file:
     u = pickle.load(file)
 with open('results/'+run+'/mpc_result_save.pkl', 'rb') as file:
     mpc_result_save = pickle.load(file)
+with open('results/' + run + '/accept_rates.pkl', 'rb') as file:
+    accept_rates = pickle.load(file)
 
 
 fontsize=12
+fig = plt.figure(figsize=(6,4))
 plt.subplot(2,1,1)
 plt.rcParams["font.family"] = "Times New Roman"
 #print(plt.rcParams['axes.prop_cycle'].by_key()['color'])
@@ -112,12 +115,13 @@ plt.plot(u,linewidth=2., color='k')
 # plt.axhline(u_ub,linestyle='--',color='r',linewidth=2.)
 plt.ylabel('u', fontsize=fontsize)
 plt.xlabel(r'$t$', fontsize=fontsize)
-plt.figlegend(loc='upper center',bbox_to_anchor=[0.55, 0.07], ncol=5)
+plt.figlegend(loc='upper center',bbox_to_anchor=[0.55, 0.063], ncol=5)
 plt.tight_layout(rect=[0.0,0.03,1,1])
-# plt.savefig('stills/order1_x_u.png', format='png')
-# plt.close()
-plt.show()
+plt.savefig('stills/order1_x_u.png', format='png')
+plt.close()
+# plt.show()
 
+fig = plt.figure(figsize=(6.4,3.5))
 plt.subplot(2,2,1)
 plt.rcParams["font.family"] = "Times New Roman"
 plt.plot(a_est_save.mean(axis=0),linewidth=2)
@@ -146,13 +150,13 @@ plt.fill_between(np.arange(T),np.percentile(r_est_save,97.5,axis=0),np.percentil
 plt.ylabel(r'$r$',fontsize=fontsize)
 plt.axhline(r_true,linestyle='--',color='k',linewidth=2.)
 plt.xlabel(r'$t$',fontsize=fontsize)
-plt.figlegend(loc='upper center',bbox_to_anchor=[0.54, 0.0666666], ncol=5)
+plt.figlegend(loc='upper center',bbox_to_anchor=[0.54, 0.1], ncol=5)
 plt.tight_layout(rect=[0,0.03,1,1])
 # plt.savefig('stills/order1_params.png', format='png')
 # plt.close()
 plt.show()
 
-tt = 9
+tt = 13
 result = mpc_result_save[tt]
 xt = np.reshape(x[tt],(1,1))
 ut = np.array([[u[tt]]])
@@ -175,6 +179,8 @@ if len(input_constraints) > 0:
     print('Input constraint satisfaction over forecast horizon')
     print(cu >= 0)
 #
+
+fig = plt.figure(figsize=(6,3.7))
 for i in range(3):
     plt.subplot(2,3,i+1)
     plt.rcParams["font.family"] = "Times New Roman"
@@ -185,17 +191,19 @@ for i in range(3):
     plt.axvline(x_star, linestyle='--', color='g', linewidth=2, label='target')
     plt.axvline(x_ub, linestyle='--', color='r', linewidth=2, label='constraint')
     plt.xlabel(r'$x_{t+k}$ for $k='+str(i*3+1)+'$', fontsize=fontsize)
-    plt.xlim([-0.7,2.3])
+    plt.xlim([-0.7,2.1])
     plt.yticks([])
 plt.tight_layout()
 
 plt.subplot(2,1,2)
 plt.rcParams["font.family"] = "Times New Roman"
 plt.plot(np.arange(1,N+1),uc[0,:],color='k',linewidth=2.0)
-plt.axhline(u_ub, linestyle='--', color='r', linewidth=2, label='constraint')
+# plt.axhline(u_ub, linestyle='--', color='r', linewidth=2, label='constraint')
 plt.xlabel(r'$u_{t+k}$ for $k \in [1,N]$', fontsize=fontsize)
 plt.ylabel(r'u', fontsize=fontsize)
 plt.xlim([1,10])
+plt.savefig('stills/order1_mpc_horizon.png', format='png')
+# plt.close()
 plt.show()
 
 

@@ -168,8 +168,7 @@ theta_true = fill_theta(theta_true)
 
 ## load results
 # run = 'rotary_inverted_pendulum_demo_results'
-run = 'pend_mismatch_test5'
-# run = 'pend_mismatch_test_floatingpoint'
+run = 'pendulum_damping_mismatch_results'
 with open('results/'+run+'/xt_est_save100.pkl','rb') as file:
     xt_est_save = pickle.load(file)
 with open('results/'+run+'/theta_est_save100.pkl','rb') as file:
@@ -186,6 +185,8 @@ with open('results/'+run+'/mpc_result_save100.pkl', 'rb') as file:
     mpc_result_save = pickle.load(file)
 with open('results/'+run+'/uc_save100.pkl', 'rb') as file:
     uc_save = pickle.load(file)
+with open('results/' + run + '/accept_rates.pkl', 'rb') as file:
+    accept_rates = pickle.load(file)
 
 ## Plot results
 plotme1 = True

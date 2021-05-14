@@ -18,6 +18,7 @@
 ###############################################################################
 
 """ This script runs simulation B) Rotary inverted pendulum from the paper and saves the results """
+""" A mismatch between the damping model used for simulation and the damping model used for estimation """
 """ This script will take a fair amount of time to run if you have not installed cuda enabled JAX,
     presaved results are included and can be plotted without running this script """
 """ The results can then be plotted using the script 'plot_pendulum_results.py' """
@@ -457,8 +458,7 @@ for t in tqdm(range(T), desc='Simulating system, running hmc, calculating contro
 
     uc_save[0, :, t] = uc[0, :]
 
-# run = 'pend_mismatch_test_floatingpoint'
-run = 'pend_mismatch_test5'
+run = 'pendulum_damping_mismatch_results'
 with open('results/' + run + '/xt_est_save100.pkl', 'wb') as file:
     pickle.dump(xt_est_save, file)
 with open('results/' + run + '/theta_est_save100.pkl', 'wb') as file:
