@@ -1,4 +1,4 @@
-# Data to control: An approximate solution
+# Data to Controller for Nonlinear Systems: An Approximate Solution
 
 Companion code to the paper 
 
