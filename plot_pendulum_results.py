@@ -245,15 +245,24 @@ if plotme1:
     plt.xlabel('Time (s)')
 
     plt.subplot(3, 2, 6)
-    kin_pend = 0.5*z_sim[2,0,:-1]*z_sim[2,0,:-1]*(mp_true*Lp_true*Lp_true + (mp_true*Lp_true*Lp_true+Jp_true)*np.sin(z_sim[1,0,:-1])*np.sin(z_sim[1,0,:-1]) + Lp_true)
-    kin_pend = kin_pend + 0.5*z_sim[3,0,:-1]*z_sim[3,0,:-1]*(Jp_true+mp_true*Lp_true*Lp_true) + mp_true*Lr_true*Lp_true*np.cos(z_sim[1,0,:-1])*z_sim[3,0,:-1]*z_sim[2,0,:-1]
-    kin_base = 0.5*z_sim[2,0,:-1]*z_sim[2,0,:-1]*(mr_true*Lr_true*Lr_true + Jr_true)
-    kin = kin_base + kin_pend
-    pot = grav*mp_true*Lp_true*(1 - np.cos(z_sim[1,0,:-1]))
-    plt.plot(ts,kin_pend + pot, color=u'#1f77b4',linewidth = 1)
+    pot = grav*mp_true*Lp_true*(1-np.cos(z_sim[1,0,:-1]))
+    nu_sim = z_sim[2:4,[0],:-1]
+    m11 = mp_true*Lr_true*Lr_true + 0.25*mp_true*Lp_true*Lp_true*(1 - (np.cos(z_sim[1,0,:-1])**2)) + Jr_true
+    m12 = 0.5*mp_true*Lp_true*Lr_true*np.cos(z_sim[1,0,:-1])
+    m22 = Jp_true + 0.25*mp_true*Lp_true*Lp_true
+    Mass = np.zeros((2,2,nu_sim.shape[2]),dtype=float)
+    Mass[0,0,:] = m11
+    Mass[1,0,:] = m12
+    Mass[0,1,:] = m12
+    Mass[1,1,:] = m22
+    kin = np.zeros_like(pot)
+    for ii in np.arange(nu_sim.shape[2]):
+        kin[ii] = 0.5 * nu_sim[:,:,ii].transpose() @ Mass[:,:,ii] @ nu_sim[:,:,ii]
+    
+    plt.plot(ts,kin + pot, color=u'#1f77b4',linewidth = 1)
     plt.ticklabel_format(style='sci',axis='y',scilimits=(0,0))
     plt.xlim([0,49*0.025])
-    plt.ylabel('Total energy (J)')
+    plt.ylabel('Pend. energy (J)')
     plt.xlabel('Time (s)')
 
 
