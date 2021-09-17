@@ -6,7 +6,7 @@ Title: Data  to  Controller  for  Nonlinear  Systems:  An  Approximate  Solution
 
 Authors: Johannes N. Hendriks, James R. Z. Holdsworth, Adrian G. Wills, Thomas B. Schön and Brett Ninness
 
-Joint submission to the 2021 Control Design Conference and The IEEE Control Systems Letters.
+Joint submission to the 2021 Control Design Conference and The IEEE Control Systems Letters (10.1109/LCSYS.2021.3090349).
 
 ## Paper Abstract
 
